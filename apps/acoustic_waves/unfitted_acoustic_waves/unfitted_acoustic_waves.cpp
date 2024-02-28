@@ -2254,20 +2254,20 @@ void ECutHHOFirstOrderEigenCFL(int argc, char **argv){
 //                }
                 Kg = analysis.Mc_inv()*Kg;
                 
-                Spectra::SparseGenMatProd<RealType> op(Kg);
-                Spectra::GenEigsSolver< RealType, Spectra::LARGEST_MAGN,
-                                        Spectra::SparseGenMatProd<RealType> > max_eigs(&op, 1, 8);
-                tc.toc();
-                simulation_log << "Generalized Eigen Solver creation time: " << tc << " seconds" << std::endl;
+                // Spectra::SparseGenMatProd<RealType> op(Kg);
+                // Spectra::GenEigsSolver< RealType, Spectra::LARGEST_MAGN,
+                //                         Spectra::SparseGenMatProd<RealType> > max_eigs(&op, 1, 8);
+                // tc.toc();
+                // simulation_log << "Generalized Eigen Solver creation time: " << tc << " seconds" << std::endl;
                 
-                tc.tic();
-                max_eigs.init();
-                max_eigs.compute();
-                tc.toc();
-                if(max_eigs.info() == Spectra::SUCCESSFUL){
-                    lambda_max = max_eigs.eigenvalues()(0).real();
-                }
-                simulation_log << "Generalized Eigen Solver compute time: " << tc << " seconds" << std::endl;
+                // tc.tic();
+                // max_eigs.init();
+                // max_eigs.compute();
+                // tc.toc();
+                // if(max_eigs.info() == Spectra::SUCCESSFUL){
+                //     lambda_max = max_eigs.eigenvalues()(0).real();
+                // }
+                // simulation_log << "Generalized Eigen Solver compute time: " << tc << " seconds" << std::endl;
                 
             }
             

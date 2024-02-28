@@ -1,6 +1,7 @@
 {
     "files.associations": {
         ".inc": ".f90",
-        "core": "cpp"
+        "core": "cpp",
+        "solvers": "cpp"
     }
 }

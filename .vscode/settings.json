@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        ".inc": ".f90",
+        "core": "cpp"
+    }
+}

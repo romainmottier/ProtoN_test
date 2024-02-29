@@ -15,7 +15,8 @@ template<typename Mesh>
 class postprocessor {
     
 public:
-       
+    
+    
     // Write a silo file for one field approximation
     static void write_silo_one_field(std::string silo_file_name, size_t it, Mesh & msh, hho_degree_info & hho_di, one_field_interface_assembler<Mesh, std::function<double(const typename Mesh::point_type& )>> & assembler, Matrix<double, Dynamic, 1> & x_dof,
     std::function<double(const typename Mesh::point_type& )> scal_fun, bool cell_centered_Q = false){
@@ -24,9 +25,9 @@ public:
         tc.tic();
         
         auto dim = 2;
-        auto num_cells  = msh.cells.size();
+        auto num_cells = msh.cells.size();
         auto num_points = msh.points.size();
-        using RealType  = double;
+        using RealType = double;
         std::vector<RealType> exact_u, approx_u;
         
         if (cell_centered_Q) {
@@ -72,9 +73,7 @@ public:
                 cell_i++;
             }
 
-        }
-        
-        else {
+        }else{
 
             exact_u.reserve( num_points );
             approx_u.reserve( num_points );
@@ -408,11 +407,11 @@ public:
            }
            cell_i++;
        }
- 
-       scalar_l2_error = std::accumulate(l2_error_vec.begin(), l2_error_vec.end(),0.0);
-       flux_l2_error = std::accumulate(flux_l2_error_vec.begin(), flux_l2_error_vec.end(),0.0);
+       
+       scalar_l2_error = std::accumulate(l2_error_vec.begin(), flux_l2_error_vec.end(),0.0);
+       flux_l2_error = std::accumulate(l2_error_vec.begin(), flux_l2_error_vec.end(),0.0);
        tc.toc();
-     
+       
        std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
        error_file << "Characteristic h size = " << std::setprecision(16) << h << std::endl;
        error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(scalar_l2_error) << std::endl;

@@ -102,16 +102,16 @@ typedef cuthho_poly_mesh<RealType>  mesh_type;
 // Prototype sources 
 #include "Prototypes/CutHHOSecondOrderConvTest.hpp"
 #include "Prototypes/CutHHOFirstOrderConvTest.hpp"
-#include "Prototypes/ICutHHOSecondOrder.hpp"
-#include "Prototypes/ICutHHOFirstOrder.hpp"
-#include "Prototypes/ECutHHOFirstOrder.hpp"
-#include "Prototypes/ECutHHOFirstOrderCFL.hpp"
-#include "Prototypes/ECutHHOFirstOrderEigenCFL.hpp"
-#include "Prototypes/HeterogeneousGar6moreICutHHOSecondOrder.hpp"
-#include "Prototypes/HeterogeneousGar6moreICutHHOFirstOrder.hpp"
-#include "Prototypes/HeterogeneousFlowerICutHHOSecondOrder.hpp"
-#include "Prototypes/HeterogeneousFlowerICutHHOFirstOrder.hpp"
-#include "Prototypes/HeterogeneousFlowerECutHHOFirstOrder.hpp"
+// #include "Prototypes/ICutHHOSecondOrder.hpp"
+// #include "Prototypes/ICutHHOFirstOrder.hpp"
+// #include "Prototypes/ECutHHOFirstOrder.hpp"
+// #include "Prototypes/ECutHHOFirstOrderCFL.hpp"
+// #include "Prototypes/ECutHHOFirstOrderEigenCFL.hpp"
+// #include "Prototypes/HeterogeneousGar6moreICutHHOSecondOrder.hpp"
+// #include "Prototypes/HeterogeneousGar6moreICutHHOFirstOrder.hpp"
+// #include "Prototypes/HeterogeneousFlowerICutHHOSecondOrder.hpp"
+// #include "Prototypes/HeterogeneousFlowerICutHHOFirstOrder.hpp"
+// #include "Prototypes/HeterogeneousFlowerECutHHOFirstOrder.hpp"
 
 // source /opt/intel/oneapi/setvars.sh intel64
 // ./unfitted....
@@ -119,8 +119,8 @@ typedef cuthho_poly_mesh<RealType>  mesh_type;
 int main(int argc, char **argv)
 {
     // Steady diffusion problem
-    // CutHHOSecondOrderConvTest(argc, argv); 			// Fonctionne avec source... 
-    // CutHHOFirstOrderConvTest(argc, argv);  			// Fonctionne avec source...
+    CutHHOSecondOrderConvTest(argc, argv); 			// Fonctionne avec source... 
+    CutHHOFirstOrderConvTest(argc, argv);  			// Fonctionne avec source...
 
     // Newmark - schemes / homogeneous cases 
     // ICutHHOSecondOrder(argc, argv);				// Fonctionne avec source...
@@ -136,7 +136,7 @@ int main(int argc, char **argv)
     
     // SDIRK - Schemes / heterogeneous cases 
     // HeterogeneousFlowerICutHHOFirstOrder(argc, argv);	// Fonctionne
-     HeterogeneousFlowerECutHHOFirstOrder(argc, argv);	// Fonctionne 
+    //  HeterogeneousFlowerECutHHOFirstOrder(argc, argv);	// Fonctionne 
     
     // Gar6more / heterogeneous cases 
     // HeterogeneousGar6moreICutHHOSecondOrder(argc, argv);	// Fonctionne pas

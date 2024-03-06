@@ -45,7 +45,7 @@ create_mixed_kg_and_mg_cuthho_interface(const Mesh& msh, hho_degree_info & hdi, 
     assembler.finalize();
 
     tc.toc();
-    std::cout << bold << yellow << "Matrix assembly: " << tc << " seconds" << reset << std::endl;
+    std::cout << bold << yellow << "         Matrix assembly: " << tc << " seconds" << reset << std::endl;
     
     Kg = assembler.LHS;
     Mg = assembler.MASS;

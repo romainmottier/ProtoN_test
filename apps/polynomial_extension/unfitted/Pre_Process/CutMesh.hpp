@@ -22,7 +22,7 @@ void CutMesh(mesh_type & msh, level_set<RealType> & level_set_function, size_t i
     }
     
     tc.toc();
-    std::cout << bold << yellow << "cutHHO-specific mesh preprocessing: " << tc << " seconds" << reset << std::endl;
+    std::cout << bold << yellow << "         cutHHO-specific mesh preprocessing: " << tc << " seconds" << reset << std::endl;
 }
 
 #endif

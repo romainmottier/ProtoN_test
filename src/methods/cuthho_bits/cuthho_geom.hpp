@@ -896,11 +896,11 @@ void dump_mesh(const cuthho_mesh<T, ET>& msh) {
     for (auto& fc : msh.faces) {
       auto pts = points(msh, fc);
       if (fc.is_boundary)
-        ofs2 << "plt.plot([" << pts[0].x() << ", " << pts[1].x() << "], [" << pts[0].y() << ", " << pts[1].y() << "], color='darkred', linewidth=2)" << std::endl;
+        ofs2 << "plt.plot([" << pts[0].x() << ", " << pts[1].x() << "], [" << pts[0].y() << ", " << pts[1].y() << "], color='k', linewidth=1)" << std::endl;
       else if ( is_cut(msh, fc) )
-        ofs2 << "plt.plot([" << pts[0].x() << ", " << pts[1].x() << "], [" << pts[0].y() << ", " << pts[1].y() << "], color='darkgreen', linewidth=2)" << std::endl;
+        ofs2 << "plt.plot([" << pts[0].x() << ", " << pts[1].x() << "], [" << pts[0].y() << ", " << pts[1].y() << "], color='darkred', linewidth=2)" << std::endl;
       else
-        ofs2 << "plt.plot([" << pts[0].x() << ", " << pts[1].x() << "], [" << pts[0].y() << ", " << pts[1].y() << "], color='k', linewidth=2)" << std::endl;
+        ofs2 << "plt.plot([" << pts[0].x() << ", " << pts[1].x() << "], [" << pts[0].y() << ", " << pts[1].y() << "], color='k', linewidth=1)" << std::endl;
       auto bar = barycenter(msh, fc);
       ofs2 << "#plt.text(" << bar.x() << ", " << bar.y() << ", '" << i << "')" << std::endl;
       i++;
@@ -914,30 +914,30 @@ void dump_mesh(const cuthho_mesh<T, ET>& msh) {
             auto p0 = cl.user_data.p0;
             auto p1 = cl.user_data.p1;
             auto q = p1 - p0;
-            ofs2 << "plt.quiver(" << p0.x() << ", " << p0.y() << ", " << q.x() << ", " << q.y() << ", 0)" << std::endl;
+            ofs2 << "#plt.quiver(" << p0.x() << ", " << p0.y() << ", " << q.x() << ", " << q.y() << ", 0)" << std::endl;
             for (size_t i = 1; i < cl.user_data.interface.size(); i++) {
                 auto s = cl.user_data.interface.at(i-1);
                 auto l = cl.user_data.interface.at(i) - s;
-                ofs2 << "plt.quiver(" << s.x() << ", " << s.y() << ", " << l.x() << ", " << l.y() << ", 0)" << std::endl;
+                ofs2 << "#plt.quiver(" << s.x() << ", " << s.y() << ", " << l.x() << ", " << l.y() << ", 0)" << std::endl;
             }
-
+            // Interface refinment points
             for (auto& ip : cl.user_data.interface)
-                ofs2 << "plt.plot(" << ip.x() << ", " << ip.y() << ", '*k')" << std::endl;
-
+                ofs2 << "#plt.plot(" << ip.x() << ", " << ip.y() << ", 'dr')" << std::endl;
+            // Barycenter of negative side
             auto tpn = collect_triangulation_points(msh, cl, element_location::IN_NEGATIVE_SIDE);
             auto bn = barycenter(tpn);
-            ofs2 << "plt.plot(" << bn.x() << ", " << bn.y() << ", 'dr')" << std::endl;
-
+            ofs2 << "#plt.plot(" << bn.x() << ", " << bn.y() << ", 'dr')" << std::endl;
+            // Barycenter of positive side
             auto tpp = collect_triangulation_points(msh, cl, element_location::IN_POSITIVE_SIDE);
             auto bp = barycenter(tpp);
-            ofs2 << "plt.plot(" << bp.x() << ", " << bp.y() << ", 'db')" << std::endl;
+            ofs2 << "#plt.plot(" << bp.x() << ", " << bp.y() << ", 'db')" << std::endl;
         }
         i++;
     }
     ofs2 << "t = np.linspace(0, 2*np.pi, 1000)" << std::endl;
-    ofs2 << "x = np.sqrt(0.15) * np.cos(t) + 0.5" << std::endl;
-    ofs2 << "y = np.sqrt(0.15) * np.sin(t) + 0.5" << std::endl;
-    ofs2 << "plt.plot(x, y)" << std::endl;
+    ofs2 << "x = (1.0/3.0) * np.cos(t) + 0.5" << std::endl;
+    ofs2 << "y = (1.0/3.0) * np.sin(t) + 0.5" << std::endl;
+    ofs2 << "plt.plot(x, y, linewidth=2, color='navy')" << std::endl;
     ofs2 << "plt.show()";
     ofs2.close();
 

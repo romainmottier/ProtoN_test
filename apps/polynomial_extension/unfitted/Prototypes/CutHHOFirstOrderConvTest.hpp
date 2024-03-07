@@ -58,7 +58,7 @@ void CutHHOFirstOrderConvTest(int argc, char **argv){
     std::cout << "      ";
     std::cout << bold << "Time refinement level      -n : " << nt_divs << std::endl;
     std::cout << "      ";
-    std::cout << bold << "Interface refinement level -n : " << int_refsteps << std::endl;
+    std::cout << bold << "Interface refinement level -r : " << int_refsteps << std::endl;
     std::cout << "      ";
     std::cout << bold << "Debug & Silo files         -d : " << dump_debug << reset << std::endl << std::endl;
 

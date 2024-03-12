@@ -1046,34 +1046,35 @@ output_agglo_lists_step4(Mesh& msh, std::vector<int> table_neg, std::vector<int>
     // loop on the cells
     size_t cp = 0;
     for (auto cl : msh.cells) {
-        auto h = diameter(msh, cl);
         size_t TN = table_neg.at(cp);
         if( TN != -1) {
-            auto bar_cl = barycenter(msh,cl);
-            auto bar_neigh = barycenter(msh,msh.cells.at(TN));
-            auto vect = bar_neigh - bar_cl;
-            if (vect[0] <= 1e-10) {
-                bar_cl[0] = bar_cl[0] - h/5.0;
-            }
-            else {
-                bar_cl[1] = bar_cl[1] - h/5.0;
-            }
-            output << bar_cl[0] << "   " << bar_cl[1] << "   0.   "
-                   << vect[0] << "   " << vect[1] << std::endl;
+          auto h = diameter(msh, cl);
+          auto bar_cl = barycenter(msh,cl);
+          auto bar_neigh = barycenter(msh,msh.cells.at(TN));
+          auto vect = bar_neigh - bar_cl;
+          if (vect[0] <= 1e-5 && vect[1] > 0) {
+            bar_cl[0] = bar_cl[0] - h/6.0;
+          }
+          else if (vect[1] <= 1e-5 && vect[0] > 0){
+            bar_cl[1] = bar_cl[1] - h/6.0;
+          }
+          output << bar_cl[0] << "   " << bar_cl[1] << "   0.   "
+                 << vect[0] << "   " << vect[1] << std::endl;
         }
         size_t TP = table_pos.at(cp);
         if( TP != -1) {
-            auto bar_cl = barycenter(msh,cl);
-            auto bar_neigh = barycenter(msh,msh.cells.at(TP));
-            auto vect = bar_neigh - bar_cl;
-            if (vect[0] <= 1e-10) {
-                bar_cl[0] = bar_cl[0] + h/5.0;
-            }
-            else {
-                bar_cl[1] = bar_cl[1] + h/5.0;
-            }
-            output << bar_cl[0] << "   " << bar_cl[1] << "   0.   "
-                   << vect[0] << "   " << vect[1] << std::endl;
+          auto h = diameter(msh, cl);
+          auto bar_cl = barycenter(msh,cl);
+          auto bar_neigh = barycenter(msh,msh.cells.at(TP));
+          auto vect = bar_neigh - bar_cl;
+        //   if (vect[0] <= 1e-5) {
+        //     bar_cl[0] = bar_cl[0];
+        //   }
+        //   else if (vect[1] <= 1e-5) {
+        //     bar_cl[1] = bar_cl[1]; 
+        //   }
+          output << bar_cl[0] << "   " << bar_cl[1] << "   0.   "
+                 << vect[0] << "   " << vect[1] << std::endl;
         }
         cp++;
     }
@@ -1563,8 +1564,7 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
         if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {  
           for(size_t i = 0; i < table_pos.size(); i++) {
             if(table_pos.at(i) == offset_cl) {
-              TN = i;
-              std::cout << "blabla";
+              table_neg.at(offset_cl) = i;
               break;
             }
           }
@@ -1574,35 +1574,13 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
         if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) { 
           for(size_t i = 0; i < table_neg.size(); i++) {
             if(table_neg.at(i) == offset_cl) {
-              TP = i;
-              std::cout << "blabla";
+              table_pos.at(offset_cl) = i;
               break;
             }
           }
         }
       }
     }
-
-    // loop on the cells
-    for (auto cl : msh.cells) {
-      // FIND THE CELL OFFSET
-      auto offset_cl = offset(msh,cl);
-      auto TN = table_neg.at(offset_cl);
-      auto TP = table_pos.at(offset_cl);
-      std::cout << std::endl;
-      std::cout << "TN = " << TN << std::endl;
-      std::cout << "TP = " << TP << std::endl;
-      std::cout << "offset = " << offset_cl << std::endl;
-    }
     output_agglo_lists_step4(msh, table_neg, table_pos, "agglo_four.okc");
-    
-    ////////////  output some info
-    std::ofstream output_cells("output_cells.txt", std::ios::out | std::ios::trunc);
-
-    output_cells << " NB_CELLS_STEP_1 = " << nb_step1 << std::endl;
-    output_cells << " NB_CELLS_STEP_2 = " << nb_step2 << std::endl;
-    output_cells << " NB_CELLS_STEP_3 = " << nb_step3 << std::endl;
-
-    output_cells.close();
 }
 

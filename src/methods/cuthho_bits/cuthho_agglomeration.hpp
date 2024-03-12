@@ -984,35 +984,98 @@ output_agglo_lists(Mesh& msh, std::vector<int> table_neg, std::vector<int> table
 
     // loop on the cells
     size_t cp = 0;
-    for (auto cl : msh.cells)
-    {
+    for (auto cl : msh.cells) {
         size_t TN = table_neg.at(cp);
-        if( TN != -1)
-        {
+        if( TN != -1) {
             auto bar_cl = barycenter(msh,cl);
             auto bar_neigh = barycenter(msh,msh.cells.at(TN));
-
             auto vect = bar_neigh - bar_cl;
-
             output << bar_cl[0] << "   " << bar_cl[1] << "   0.   "
                    << vect[0] << "   " << vect[1] << std::endl;
         }
 
 
         size_t TP = table_pos.at(cp);
-        if( TP != -1)
-        {
+        if( TP != -1) {
             auto bar_cl = barycenter(msh,cl);
             auto bar_neigh = barycenter(msh,msh.cells.at(TP));
-
             auto vect = bar_neigh - bar_cl;
-
             output << bar_cl[0] << "   " << bar_cl[1] << "   0.   "
                    << vect[0] << "   " << vect[1] << std::endl;
         }
         cp++;
     }
 
+    output.close();
+}
+
+template<typename Mesh>
+void
+output_agglo_lists_step4(Mesh& msh, std::vector<int> table_neg, std::vector<int> table_pos,
+                   std::string file)
+{
+    // number of arrows
+    size_t nb_arrows = 0;
+    for(size_t i=0; i<table_neg.size(); i++) {
+        if(table_neg.at(i) != -1)
+            nb_arrows++;
+        if(table_pos.at(i) != -1)
+            nb_arrows++;
+    }
+
+    // initiate the output file
+    std::ofstream output(file, std::ios::out | std::ios::trunc);
+    if( !output )
+        std::cerr << "agglo output file has not been opened" << std::endl;
+
+    output << "5 " << nb_arrows << " 12" << std::endl;
+    output << "x" << std::endl;
+    output << "y" << std::endl;
+    output << "z" << std::endl;
+    output << "u" << std::endl;
+    output << "v" << std::endl;
+
+    output << "0.  1.  10" << std::endl;
+    output << "0.  1.  10" << std::endl;
+    output << "0.  0.  10" << std::endl;
+    output << "-1  1.  10" << std::endl;
+    output << "-1  1.  10" << std::endl;
+
+
+    // loop on the cells
+    size_t cp = 0;
+    for (auto cl : msh.cells) {
+        auto h = diameter(msh, cl);
+        size_t TN = table_neg.at(cp);
+        if( TN != -1) {
+            auto bar_cl = barycenter(msh,cl);
+            auto bar_neigh = barycenter(msh,msh.cells.at(TN));
+            auto vect = bar_neigh - bar_cl;
+            if (vect[0] <= 1e-10) {
+                bar_cl[0] = bar_cl[0] - h/5.0;
+            }
+            else {
+                bar_cl[1] = bar_cl[1] - h/5.0;
+            }
+            output << bar_cl[0] << "   " << bar_cl[1] << "   0.   "
+                   << vect[0] << "   " << vect[1] << std::endl;
+        }
+        size_t TP = table_pos.at(cp);
+        if( TP != -1) {
+            auto bar_cl = barycenter(msh,cl);
+            auto bar_neigh = barycenter(msh,msh.cells.at(TP));
+            auto vect = bar_neigh - bar_cl;
+            if (vect[0] <= 1e-10) {
+                bar_cl[0] = bar_cl[0] + h/5.0;
+            }
+            else {
+                bar_cl[1] = bar_cl[1] + h/5.0;
+            }
+            output << bar_cl[0] << "   " << bar_cl[1] << "   0.   "
+                   << vect[0] << "   " << vect[1] << std::endl;
+        }
+        cp++;
+    }
     output.close();
 }
 
@@ -1034,8 +1097,7 @@ make_agglomeration(Mesh& msh, const Function& level_set_function) {
     agglo_table_neg.resize(nb_cells);
     agglo_table_pos.resize(nb_cells);
     
-    for(size_t i=0; i < nb_cells; i++)
-    {
+    for(size_t i=0; i < nb_cells; i++) {
         agglo_table_neg.at(i) = -1;
         agglo_table_pos.at(i) = -1;
     }
@@ -1072,15 +1134,14 @@ make_agglomeration(Mesh& msh, const Function& level_set_function) {
             // if cl is already agglomerated : no need for further agglomerations
             bool already_agglo = false;
             size_t offset_cl = offset(msh, cl);
-            for (size_t i = 0; i < agglo_table_pos.size(); i++)
-            {
+            for (size_t i = 0; i < agglo_table_pos.size(); i++) {
                 if( agglo_table_pos.at(i) == offset_cl || agglo_table_neg.at(i) == offset_cl )
                 {
                     already_agglo = true;
                     break;
                 }
             }
-            if( already_agglo )
+            if (already_agglo)
                 continue;
 
 
@@ -1092,13 +1153,11 @@ make_agglomeration(Mesh& msh, const Function& level_set_function) {
             size_t offset1 = offset(msh,cl);
             size_t offset2 = offset(msh,best_neigh);
 
-            if(where == element_location::IN_NEGATIVE_SIDE)
-            {
+            if(where == element_location::IN_NEGATIVE_SIDE) {
                 agglo_table_neg.at(offset1) = offset2;
                 nb_step1++;
             }
-            else
-            {
+            else {
                 agglo_table_pos.at(offset1) = offset2;
                 nb_step2++;
             }
@@ -1109,10 +1168,10 @@ make_agglomeration(Mesh& msh, const Function& level_set_function) {
         if(domain == 2)
             output_agglo_lists(msh, agglo_table_neg, agglo_table_pos, "agglo_two.okc");
     }
+
     //////////////   CHANGE THE AGGLO FOR THE CELLS OF DOMAIN 1 THAT ARE TARGETTED ///////
     size_t nb_step3 = 0;
-    for (auto cl : msh.cells)
-    {
+    for (auto cl : msh.cells) {
         if(cl.user_data.agglo_set != cell_agglo_set::T_KO_NEG)
             continue;
 
@@ -1498,6 +1557,10 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
     }
     output_agglo_lists(msh, table_neg, table_pos, "agglo_three.okc");
     
+    ///////////////////////////////////////////////////////////////////////////// STEP 4 
+    
+
+
     ////////////  output some info
     std::ofstream output_cells("output_cells.txt", std::ios::out | std::ios::trunc);
 

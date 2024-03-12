@@ -4,7 +4,13 @@
         "core": "cpp",
         "solvers": "cpp",
         "list": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "array": "cpp",
+        "bitset": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp",
+        "utility": "cpp",
+        "ostream": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

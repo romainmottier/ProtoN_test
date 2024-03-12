@@ -1012,15 +1012,16 @@ output_agglo_lists(Mesh& msh, std::vector<int> table_neg, std::vector<int> table
 template<typename Mesh>
 void
 output_agglo_lists_step4(Mesh& msh, std::vector<int> table_neg, std::vector<int> table_pos,
-                   std::string file)
-{
+                   std::string file) {
     // number of arrows
     size_t nb_arrows = 0;
-    for(size_t i=0; i<table_neg.size(); i++) {
-        if(table_neg.at(i) != -1)
-            nb_arrows++;
-        if(table_pos.at(i) != -1)
-            nb_arrows++;
+    for (size_t i=0; i<table_neg.size(); i++) {
+      if(table_neg.at(i) != -1)
+        nb_arrows++;
+    }
+    for (size_t i=0; i<table_pos.size(); i++) {
+      if(table_pos.at(i) != -1)
+        nb_arrows++;
     }
 
     // initiate the output file
@@ -1434,8 +1435,8 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
     table_neg.resize(nb_cells);
     table_pos.resize(nb_cells);
     for(size_t i=0; i < nb_cells; i++) {
-        table_neg.at(i) = -1;
-        table_pos.at(i) = -1;
+      table_neg.at(i) = -1;
+      table_pos.at(i) = -1;
     }
 
     ///////////////////////   LOOK FOR NEIGHBORS  ////////////////
@@ -1470,10 +1471,8 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
             // if cl is already agglomerated : no need for further agglomerations
             bool already_agglo = false;
             size_t offset_cl = offset(msh, cl);
-            for (size_t i = 0; i < table_pos.size(); i++)
-            {
-                if( table_pos.at(i) == offset_cl || table_neg.at(i) == offset_cl )
-                {
+            for (size_t i = 0; i < table_pos.size(); i++) {
+                if( table_pos.at(i) == offset_cl || table_neg.at(i) == offset_cl ) {
                     already_agglo = true;
                     break;
                 }
@@ -1490,13 +1489,11 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
             size_t offset1 = offset(msh,cl);
             size_t offset2 = offset(msh,best_neigh);
 
-            if(where == element_location::IN_NEGATIVE_SIDE)
-            {
+            if(where == element_location::IN_NEGATIVE_SIDE) {
                 table_neg.at(offset1) = offset2;
                 nb_step1++;
             }
-            else
-            {
+            else {
                 table_pos.at(offset1) = offset2;
                 nb_step2++;
             }
@@ -1509,8 +1506,7 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
     }
     //////////////   CHANGE THE AGGLO FOR THE CELLS OF DOMAIN 1 THAT ARE TARGETTED ///////
     size_t nb_step3 = 0;
-    for (auto cl : msh.cells)
-    {
+    for (auto cl : msh.cells) {
         if(cl.user_data.agglo_set != cell_agglo_set::T_KO_NEG)
             continue;
 
@@ -1519,10 +1515,8 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
         // are there cells that try to agglomerate with cl ?
         bool agglo = false;
         size_t cl2_offset;
-        for(size_t i = 0; i < table_pos.size(); i++)
-        {
-            if(table_pos.at(i) == offset1)
-            {
+        for(size_t i = 0; i < table_pos.size(); i++) {
+            if(table_pos.at(i) == offset1) {
                 agglo = true;
                 cl2_offset = i;
                 break;
@@ -1536,13 +1530,11 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
         
         // -> check that no one tries to agglomerate with cl1_agglo
         agglo = false;
-        for(size_t i = 0; i < table_neg.size(); i++)
-        {
+        for(size_t i = 0; i < table_neg.size(); i++) {
             if( i == offset1)
                 continue;
 
-            if(table_neg.at(i) == cl1_agglo)
-            {
+            if(table_neg.at(i) == cl1_agglo) {
                 agglo = true;
                 break;
             }
@@ -1557,10 +1549,53 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
     }
     output_agglo_lists(msh, table_neg, table_pos, "agglo_three.okc");
     
+
     ///////////////////////////////////////////////////////////////////////////// STEP 4 
+    // TOUTES LES CELLULES MAL COUPEES DOIVENT POINTER VERS UNE CELLULE
+
+    // loop on the cells
+    for (auto cl : msh.cells) {
+      // FIND THE CELL OFFSET
+      auto offset_cl = offset(msh,cl);
+      auto TN = table_neg.at(offset_cl);
+      auto TP = table_pos.at(offset_cl);
+      if (TN == -1) {    
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {  
+          for(size_t i = 0; i < table_pos.size(); i++) {
+            if(table_pos.at(i) == offset_cl) {
+              TN = i;
+              std::cout << "blabla";
+              break;
+            }
+          }
+        }
+      }
+      if (TP == -1) {
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) { 
+          for(size_t i = 0; i < table_neg.size(); i++) {
+            if(table_neg.at(i) == offset_cl) {
+              TP = i;
+              std::cout << "blabla";
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // loop on the cells
+    for (auto cl : msh.cells) {
+      // FIND THE CELL OFFSET
+      auto offset_cl = offset(msh,cl);
+      auto TN = table_neg.at(offset_cl);
+      auto TP = table_pos.at(offset_cl);
+      std::cout << std::endl;
+      std::cout << "TN = " << TN << std::endl;
+      std::cout << "TP = " << TP << std::endl;
+      std::cout << "offset = " << offset_cl << std::endl;
+    }
+    output_agglo_lists_step4(msh, table_neg, table_pos, "agglo_four.okc");
     
-
-
     ////////////  output some info
     std::ofstream output_cells("output_cells.txt", std::ios::out | std::ios::trunc);
 

@@ -1587,28 +1587,43 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
         }
       }
     }
-    output_agglo_lists_step4(msh, table_neg, table_pos, "agglo_four.okc");
+
 
     // FILLING THE STRUCTURE dependent_cells 
+    size_t cpt = 0;
     for (auto cl : msh.cells) {
+      
       auto offset_cl = offset(msh,cl);
-    //   std::cout << "Cell: " << offset_cl << "   dependant cells: ";
+      std::cout << "Cell: " << offset_cl << "   dependant cells: ";
       for(size_t i = 0; i < table_pos.size(); i++) {
         if(table_pos.at(i) == offset_cl) {
-          cl.user_data.dependent_cells.push_back(table_neg.at(offset_cl));
-        //   std::cout << table_neg.at(offset_cl) << "   ";
+          cl.user_data.dependent_cells.insert(table_neg.at(offset_cl));
+          std::cout << table_neg.at(offset_cl) << "   ";
         }
       }
       for(size_t i = 0; i < table_neg.size(); i++) {
         if(table_neg.at(i) == offset_cl) {
-          cl.user_data.dependent_cells.push_back(i);
-        //   std::cout << i << "   ";
+          cl.user_data.dependent_cells.insert(i);
+          std::cout << i << "   ";
         }
       }
-    //   std::cout << std::endl;
+      std::cout << std::endl << std::endl;
+    }
+
+    for (auto cl : msh.cells) {
+      auto offset_cl = offset(msh,cl);
+      auto nb_dp_cl = cl.user_data.dependent_cells.size();
+      std::cout << "Cell: " << offset_cl << std::endl;
+      std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
+      std::cout << "Dependant cells:  ";
+      for (auto dp_cl : cl.user_data.dependent_cells) {
+        std::cout << dp_cl << "  ";
+      }
+      std::cout << std::endl << std::endl;
     }
 
 
+    output_agglo_lists_step4(msh, table_neg, table_pos, "agglo_four.okc");
 
 }
 

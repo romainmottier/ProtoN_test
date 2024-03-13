@@ -84,8 +84,7 @@ class test_case_laplacian_conv: public test_case_laplacian<T, Function, Mesh>
 };
 
 template<typename Mesh, typename Function>
-auto make_test_case_laplacian_conv(const Mesh& msh, Function level_set_function)
-{
+auto make_test_case_laplacian_conv(const Mesh& msh, Function level_set_function) {
     return test_case_laplacian_conv<typename Mesh::coordinate_type, Function, Mesh>(level_set_function);
 }
 

@@ -2,7 +2,6 @@
 #ifndef gradrec_mixed_interface_method_hpp
 #define gradrec_mixed_interface_method_hpp
 
-
 template<typename T, size_t ET, typename testType>
 class gradrec_mixed_interface_method : public mixed_interface_method<T, ET, testType>
 {
@@ -18,8 +17,7 @@ public:
 
     std::pair<Mat, Vect>
     make_contrib_cut(const Mesh& msh, const typename Mesh::cell_type& cl,
-                     const testType & test_case, const hho_degree_info hdi)
-    {
+                     const testType & test_case, const hho_degree_info hdi) {
 
         auto parms = test_case.parms;
         auto level_set_function = test_case.level_set_;
@@ -33,9 +31,9 @@ public:
         auto rbs = vector_cell_basis<Mesh,T>::size(graddeg);
 
         // GR
-        auto gr_n = make_hho_gradrec_mixed_vector_interface(msh, cl, level_set_function, hdi,
+        auto gr_n = make_hho_gradrec_mixed_vector_interface_extended(msh, cl, level_set_function, hdi,
                                                       element_location::IN_NEGATIVE_SIDE, 1.0);
-        auto gr_p = make_hho_gradrec_mixed_vector_interface(msh, cl, level_set_function, hdi,
+        auto gr_p = make_hho_gradrec_mixed_vector_interface_extended(msh, cl, level_set_function, hdi,
                                                       element_location::IN_POSITIVE_SIDE, 0.0);
 
         // stab
@@ -100,8 +98,7 @@ public:
 
 template<typename T, size_t ET, typename testType>
 auto make_gradrec_mixed_interface_method(const cuthho_mesh<T, ET>& msh, const T eta_,
-                                   testType & test_case)
-{
+                                   testType & test_case) {
     return gradrec_mixed_interface_method<T, ET, testType>(eta_);
 }
 

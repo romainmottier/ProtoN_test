@@ -55,6 +55,8 @@ struct cell_cuthho_info
 
     std::vector< std::pair<point<T,2>, T> > integration_n; // composite integration rules
     std::vector< std::pair<point<T,2>, T> > integration_p;
+    
+    std::vector<int> dependent_cells;// data pour l'extension polynomiale 
 
     bool                        highlight; // for tests
     cell_cuthho_info() :

@@ -1055,7 +1055,13 @@ output_agglo_lists_step4(Mesh& msh, std::vector<int> table_neg, std::vector<int>
           if (vect[0] <= 1e-5 && vect[1] > 0) {
             bar_cl[0] = bar_cl[0] - h/6.0;
           }
+          if (vect[0] <= 1e-5 && vect[1] < 0) {
+            bar_cl[0] = bar_cl[0] + h/6.0;
+          }
           else if (vect[1] <= 1e-5 && vect[0] > 0){
+            bar_cl[1] = bar_cl[1] + h/6.0;
+          }
+          else if (vect[1] <= 1e-5 && vect[0] < 0){
             bar_cl[1] = bar_cl[1] - h/6.0;
           }
           output << bar_cl[0] << "   " << bar_cl[1] << "   0.   "
@@ -1552,7 +1558,7 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
     
 
     ///////////////////////////////////////////////////////////////////////////// STEP 4 
-    // TOUTES LES CELLULES MAL COUPEES DOIVENT POINTER VERS UNE CELLULE
+    // ALL BAD CUT CELLS MUST POINT TOWARDS A CELL
 
     // loop on the cells
     for (auto cl : msh.cells) {
@@ -1582,5 +1588,27 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
       }
     }
     output_agglo_lists_step4(msh, table_neg, table_pos, "agglo_four.okc");
+
+    // FILLING THE STRUCTURE dependent_cells 
+    for (auto cl : msh.cells) {
+      auto offset_cl = offset(msh,cl);
+    //   std::cout << "Cell: " << offset_cl << "   dependant cells: ";
+      for(size_t i = 0; i < table_pos.size(); i++) {
+        if(table_pos.at(i) == offset_cl) {
+          cl.user_data.dependent_cells.push_back(table_neg.at(offset_cl));
+        //   std::cout << table_neg.at(offset_cl) << "   ";
+        }
+      }
+      for(size_t i = 0; i < table_neg.size(); i++) {
+        if(table_neg.at(i) == offset_cl) {
+          cl.user_data.dependent_cells.push_back(i);
+        //   std::cout << i << "   ";
+        }
+      }
+    //   std::cout << std::endl;
+    }
+
+
+
 }
 

@@ -855,15 +855,15 @@ make_hho_gradrec_mixed_vector_interface_extended(const cuthho_mesh<T, ET>& msh,
     gr_rhs.block(0, 0, gbs, 2*cbs) += coeff * interface_term;
     
     // Terms from dependant cells 
-    // auto offset_cl = offset(msh,cl);
-    // auto nb_dp_cl = cl.user_data.dependent_cells.size();
-    // std::cout << "Cell: " << offset_cl << std::endl;
-    // std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
-    // std::cout << "Dependant cells:  ";
-    // for (auto dp_cl : cl.user_data.dependent_cells) {
-    //      std::cout << dp_cl << "  ";
-    // }
-    // std::cout << std::endl << std::endl;
+    auto offset_cl = offset(msh,cl);
+    auto nb_dp_cl = cl.user_data.dependent_cells.size();
+    std::cout << "Cell: " << offset_cl << std::endl;
+    std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
+    std::cout << "Dependant cells:  ";
+    for (auto dp_cl : cl.user_data.dependent_cells) {
+         std::cout << dp_cl << "  ";
+    }
+    std::cout << std::endl << std::endl;
 
 
 

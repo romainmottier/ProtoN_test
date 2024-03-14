@@ -187,15 +187,6 @@ make_neighbors_info(cuthho_mesh<T, ET>& msh) {
             }
         }
     }
-
-    /*
-    for (auto& cl : msh.cells)
-    {
-        for (auto& n : cl.user_data.neighbors)
-            std::cout << n << " ";
-        std::cout << std::endl;
-    }
-    */
 }
 
 
@@ -205,9 +196,6 @@ make_neighbors_info(cuthho_mesh<T, ET>& msh) {
 template<typename T, size_t ET>
 void
 make_neighbors_info_cartesian(cuthho_mesh<T, ET>& msh) {
-    // std::cout << "WARNING : make_neighbors_info_cartesian "
-    //           << "works for cartesian meshes only !!"
-    //           << std::endl;
 
     size_t N = sqrt(msh.cells.size());
 
@@ -1602,10 +1590,6 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
         if(table_neg.at(i) == offset_cl) {
           cl.user_data.dependent_cells.insert(i);
         }
-      }
-      
-      auto nb_dp_cl = cl.user_data.dependent_cells.size();
-      for (auto dp_cl : cl.user_data.dependent_cells) {
       }
     }
 

@@ -854,25 +854,54 @@ make_hho_gradrec_mixed_vector_interface_extended(const cuthho_mesh<T, ET>& msh,
     }
     gr_rhs.block(0, 0, gbs, 2*cbs) += coeff * interface_term;
     
+    /////////////////////////////////////////////////////////////////////////////////////////////
     // Terms from dependant cells 
     auto offset_cl = offset(msh,cl);
     auto nb_dp_cl = cl.user_data.dependent_cells.size();
     std::cout << "Cell: " << offset_cl << std::endl;
     std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
     std::cout << "Dependant cells:  ";
-    for (auto dp_cl : cl.user_data.dependent_cells) {
-         std::cout << dp_cl << "  ";
+    // Loop on dependant cells 
+    for (auto& dp_cl : cl.user_data.dependent_cells) {
+      std::cout << dp_cl << "  ";
+      auto dp_cell = msh.cells[dp_cl];
+      const auto dp_fcs = faces(msh, dp_cell);
+      const auto dp_ns = normals(msh, dp_cell);
+      // Dependent face's terms 
+      for (size_t i = 0; i < fcs.size(); i++) {
+        const auto dp_fc = dp_fcs[i];
+        const auto dp_n  = dp_ns[i];
+        cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, dp_fc, facdeg, where);
+        const auto qps_f = integrate(msh, dp_fc, facdeg + std::max(facdeg, celdeg), where);
+        for (auto& qp : qps_f) {
+          const vector_type c_phi      = cb.eval_basis(qp.first);
+          const vector_type f_phi      = fb.eval_basis(qp.first);
+          const auto        g_phi      = gb.eval_basis(qp.first);
+          const vector_type qp_g_phi_n = qp.second * g_phi * dp_n;
+          rhs_tmp.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
+          rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
+        }
+      }
+      // Term on the interface of the dependant cells 
+      matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
+      const auto iqps = integrate_interface(msh, dp_cell, celdeg + graddeg, element_location::IN_NEGATIVE_SIDE);
+      for (auto& qp : iqps) {
+        const auto c_phi        = cb.eval_basis(qp.first);
+        const auto g_phi        = gb.eval_basis(qp.first);
+        Matrix<T,2,1> n = level_set_function.normal(qp.first);
+        const vector_type qp_g_phi_n = qp.second * g_phi * n;
+        interface_term.block(0 , 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
+        interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n * c_phi.transpose();
+      }
+      gr_rhs.block(0, 0, gbs, 2*cbs) += coeff * interface_term;
     }
     std::cout << std::endl << std::endl;
+    /////////////////////////////////////////////////////////////////////////////////////////////
 
-
-
-
+    // Shrinking data
     auto vec_cell_size = 2*gbs;
     auto nrows = gr_rhs.cols()+vec_cell_size;
     auto ncols = gr_rhs.cols()+vec_cell_size;
-    
-    // Shrinking data
     matrix_type data_mixed = matrix_type::Zero(nrows,ncols);
     if(where == element_location::IN_NEGATIVE_SIDE) {
         data_mixed.block(0, vec_cell_size, gbs, ncols-vec_cell_size) = -gr_rhs;

@@ -1590,15 +1590,14 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
 
 
     // FILLING THE STRUCTURE dependent_cells 
-    size_t cpt = 0;
     for (auto cl : msh.cells) {
-      
       auto offset_cl = offset(msh,cl);
       std::cout << "Cell: " << offset_cl << "   dependant cells: ";
       for(size_t i = 0; i < table_pos.size(); i++) {
         if(table_pos.at(i) == offset_cl) {
-          cl.user_data.dependent_cells.insert(table_neg.at(offset_cl));
-          std::cout << table_neg.at(offset_cl) << "   ";
+          size_t TN = table_neg.at(offset_cl);
+          cl.user_data.dependent_cells.insert(TN);
+          std::cout << TN << "   ";
         }
       }
       for(size_t i = 0; i < table_neg.size(); i++) {
@@ -1608,10 +1607,7 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
         }
       }
       std::cout << std::endl << std::endl;
-    }
-
-    for (auto cl : msh.cells) {
-      auto offset_cl = offset(msh,cl);
+      
       auto nb_dp_cl = cl.user_data.dependent_cells.size();
       std::cout << "Cell: " << offset_cl << std::endl;
       std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
@@ -1619,11 +1615,20 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
       for (auto dp_cl : cl.user_data.dependent_cells) {
         std::cout << dp_cl << "  ";
       }
-      std::cout << std::endl << std::endl;
+      std::cout << std::endl;
     }
-
 
     output_agglo_lists_step4(msh, table_neg, table_pos, "agglo_four.okc");
 
+
+    std::cout << std::endl  << std::endl;
+
+    for (const auto &cl : msh.cells) {
+        std::cout << "Cell:   " << offset(msh,cl) << "   dependent cells:   ";
+        for (const auto &elem : cl.user_data.dependent_cells) {
+            std::cout << elem << "   ";
+        }
+        std::cout << std::endl;
+    }
 }
 

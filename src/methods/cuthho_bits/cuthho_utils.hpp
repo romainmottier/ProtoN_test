@@ -812,30 +812,32 @@ make_hho_gradrec_mixed_vector_interface_extended(const cuthho_mesh<T, ET>& msh,
       rhs_tmp.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose();
     }
 
-    // Face terms 
-    const auto fcs = faces(msh, cl);
-    const auto ns = normals(msh, cl);
-    for (size_t i = 0; i < fcs.size(); i++) {
-      const auto fc = fcs[i];
-      const auto n  = ns[i];
-      // face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg);
-      cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg, where);
-      const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg), where);
-      for (auto& qp : qps_f) {
-        const vector_type c_phi      = cb.eval_basis(qp.first);
-        const vector_type f_phi      = fb.eval_basis(qp.first);
-        const auto        g_phi      = gb.eval_basis(qp.first);
-        const vector_type qp_g_phi_n = qp.second * g_phi * n;
-        rhs_tmp.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
-        rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
+    // ADD FACE TERMS IF CELL IS NOT IN TKO 
+    if (cl.user_data.agglo_set != cell_agglo_set::T_KO_NEG && cl.user_data.agglo_set != cell_agglo_set::T_KO_POS) {
+      const auto fcs = faces(msh, cl);
+      const auto ns = normals(msh, cl);
+      for (size_t i = 0; i < fcs.size(); i++) {
+        const auto fc = fcs[i];
+        const auto n  = ns[i];
+        // face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg);
+        cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg, where);
+        const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg), where);
+        for (auto& qp : qps_f) {
+          const vector_type c_phi      = cb.eval_basis(qp.first);
+          const vector_type f_phi      = fb.eval_basis(qp.first);
+          const auto        g_phi      = gb.eval_basis(qp.first);
+          const vector_type qp_g_phi_n = qp.second * g_phi * n;
+          rhs_tmp.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
+          rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
+        }
       }
-    }
-    if(where == element_location::IN_NEGATIVE_SIDE) {
+    } 
+    if (where == element_location::IN_NEGATIVE_SIDE) {
         gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
         gr_rhs.block(0, 2*cbs, gbs, num_faces*fbs)
             += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
     }
-    else if( where == element_location::IN_POSITIVE_SIDE) {
+    else if ( where == element_location::IN_POSITIVE_SIDE) {
         gr_rhs.block(0, cbs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
         gr_rhs.block(0, 2*cbs + num_faces*fbs, gbs, num_faces*fbs)
                      += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
@@ -868,7 +870,7 @@ make_hho_gradrec_mixed_vector_interface_extended(const cuthho_mesh<T, ET>& msh,
       const auto dp_fcs = faces(msh, dp_cell);
       const auto dp_ns = normals(msh, dp_cell);
       // Dependent face's terms 
-      for (size_t i = 0; i < fcs.size(); i++) {
+      for (size_t i = 0; i < dp_fcs.size(); i++) {
         const auto dp_fc = dp_fcs[i];
         const auto dp_n  = dp_ns[i];
         cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, dp_fc, facdeg, where);

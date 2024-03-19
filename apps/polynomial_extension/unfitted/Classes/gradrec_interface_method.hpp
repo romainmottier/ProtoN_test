@@ -17,8 +17,7 @@ public:
 
     std::pair<Mat, Vect>
     make_contrib_cut(const Mesh& msh, const typename Mesh::cell_type& cl,
-                     const testType &test_case, const hho_degree_info hdi)
-    {
+                     const testType &test_case, const hho_degree_info hdi) {
 
         auto parms = test_case.parms;
         auto level_set_function = test_case.level_set_;
@@ -33,10 +32,8 @@ public:
         if (1.0/(parms.kappa_1) < 1.0/(parms.kappa_2)) {
             factor = 1.0;
         }
-        auto gr_n = make_hho_gradrec_vector_interface(msh, cl, level_set_function, hdi,
-                                                      element_location::IN_NEGATIVE_SIDE, 1.0-factor);
-        auto gr_p = make_hho_gradrec_vector_interface(msh, cl, level_set_function, hdi,
-                                                      element_location::IN_POSITIVE_SIDE, factor);
+        auto gr_n = make_hho_gradrec_vector_interface_extended(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE, 1.0-factor);
+        auto gr_p = make_hho_gradrec_vector_interface_extended(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE, factor);
 
         // stab
         auto stab_parms = test_case.parms;
@@ -46,19 +43,10 @@ public:
         
         T penalty_scale = std::min(1.0/(parms.kappa_1), 1.0/(parms.kappa_2));
         Mat penalty = make_hho_cut_interface_penalty(msh, cl, hdi, eta).block(0, 0, cbs, cbs);
-        stab.block(0, 0, cbs, cbs) += penalty_scale* penalty;
-        stab.block(0, cbs, cbs, cbs) -= penalty_scale * penalty;
-        stab.block(cbs, 0, cbs, cbs) -= penalty_scale * penalty;
+        stab.block(0, 0, cbs, cbs)     += penalty_scale* penalty;
+        stab.block(0, cbs, cbs, cbs)   -= penalty_scale * penalty;
+        stab.block(cbs, 0, cbs, cbs)   -= penalty_scale * penalty;
         stab.block(cbs, cbs, cbs, cbs) += penalty_scale * penalty;
-        
-//        Mat stab = make_hho_stabilization_interface(msh, cl, level_set_function, hdi, parms);
-//
-//        Mat penalty = make_hho_cut_interface_penalty(msh, cl, hdi, eta).block(0, 0, cbs, cbs);
-//        stab.block(0, 0, cbs, cbs) += parms.kappa_1 * penalty;
-//        stab.block(0, cbs, cbs, cbs) -= parms.kappa_1 * penalty;
-//        stab.block(cbs, 0, cbs, cbs) -= parms.kappa_1 * penalty;
-//        stab.block(cbs, cbs, cbs, cbs) += parms.kappa_1 * penalty;
-
 
         Mat lc = stab + stab_parms.kappa_1 * gr_n.second + stab_parms.kappa_2 * gr_p.second;
         
@@ -104,8 +92,7 @@ public:
 
     Vect
     make_contrib_rhs_cut(const Mesh& msh, const typename Mesh::cell_type& cl,
-                     const testType &test_case, const hho_degree_info hdi)
-    {
+                     const testType &test_case, const hho_degree_info hdi) {
 
         auto parms = test_case.parms;
         auto level_set_function = test_case.level_set_;
@@ -143,8 +130,7 @@ public:
 
 template<typename T, size_t ET, typename testType>
 auto make_gradrec_interface_method(const cuthho_mesh<T, ET>& msh, const T eta_,
-                                   testType test_case)
-{
+                                   testType test_case) {
     return gradrec_interface_method<T, ET, testType>(eta_);
 }
 

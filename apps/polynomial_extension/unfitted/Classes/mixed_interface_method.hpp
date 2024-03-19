@@ -14,30 +14,26 @@ protected:
 
     virtual std::pair<Mat, Vect>
     make_contrib_cut(const Mesh& msh, const typename Mesh::cell_type& cl,
-                     const testType &test_case, const hho_degree_info hdi)
-    {
+                     const testType &test_case, const hho_degree_info hdi) {
     }
     
     virtual Vect
     make_contrib_rhs_cut(const Mesh& msh, const typename Mesh::cell_type& cl,
-                     const testType &test_case, const hho_degree_info hdi)
-    {
+                     const testType &test_case, const hho_degree_info hdi) {
     }
 
 public:
     std::pair<Mat, Vect>
     make_contrib_uncut(const Mesh& msh, const typename Mesh::cell_type& cl,
-                       const hho_degree_info hdi, const testType &test_case)
-    {
+                       const hho_degree_info hdi, const testType &test_case) {
         T rho, vp;
-        if ( location(msh, cl) == element_location::IN_NEGATIVE_SIDE )
-        {
-            rho = test_case.parms.kappa_1;
-            vp = test_case.parms.c_1;
+        if ( location(msh, cl) == element_location::IN_NEGATIVE_SIDE ) {
+          rho = test_case.parms.kappa_1;
+          vp = test_case.parms.c_1;
         }
-        else{
-            rho = test_case.parms.kappa_2;
-            vp = test_case.parms.c_2;
+        else {
+          rho = test_case.parms.kappa_2;
+          vp = test_case.parms.c_2;
         }
 
         auto gr = make_hho_gradrec_mixed_vector(msh, cl, hdi);

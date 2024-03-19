@@ -153,8 +153,7 @@ public:
 
         silo.close();
         tc.toc();
-        std::cout << std::endl;
-        std::cout << bold << cyan << "Silo file rendered in : " << tc << " seconds" << reset << std::endl;
+        std::cout << bold << yellow << "         Silo file rendered in : " << tc << " seconds" << reset << std::endl;
     }
     
     // Write a silo file for two fields approximation
@@ -411,7 +410,7 @@ public:
        flux_l2_error = std::accumulate(l2_error_vec.begin(), flux_l2_error_vec.end(),0.0);
        tc.toc();
        
-       std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
+       std::cout << bold << yellow << "         Error completed: " << tc << " seconds" << reset << std::endl;
        error_file << "Characteristic h size = " << std::setprecision(16) << h << std::endl;
        error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(scalar_l2_error) << std::endl;
        error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;

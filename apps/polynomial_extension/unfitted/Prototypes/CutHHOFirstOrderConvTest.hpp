@@ -47,7 +47,7 @@ void CutHHOFirstOrderConvTest(int argc, char **argv){
     argv += optind;
 
     std::cout << std::endl << "   ";
-    std::cout << bold << red << "CONVERGENCE TEST ON LAPLACIAN CASE " << reset;
+    std::cout << bold << red << "CONVERGENCE TEST ON MIXED ELLIPTIC CASE " << reset;
     std::cout << std::endl << std::endl << "   ";
     std::cout << bold << red << "SIMULATION PARAMETERS : " << reset;
     std::cout << bold << cyan << std::endl;

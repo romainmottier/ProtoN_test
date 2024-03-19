@@ -28,8 +28,7 @@ create_mixed_kg_and_mg_cuthho_interface(const Mesh& msh, hho_degree_info & hdi, 
     std::vector<std::pair<size_t,size_t>> cell_basis_data = assembler.compute_cell_basis_data(msh);
     if(n_faces) *n_faces = assembler.get_n_faces();
     size_t cell_ind = 0;
-    for (auto& cl : msh.cells)
-    {
+    for (auto& cl : msh.cells) {
         auto contrib = method.make_contrib(msh, cl, test_case, hdi);
         auto lc = contrib.first;
         auto f = contrib.second;

@@ -1550,50 +1550,53 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
 
     // loop on the cells
     for (auto cl : msh.cells) {
-      // FIND THE CELL OFFSET
-      auto offset_cl = offset(msh,cl);
-      auto TN = table_neg.at(offset_cl);
-      auto TP = table_pos.at(offset_cl);
-      if (TN == -1) {    
-        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {  
-          for(size_t i = 0; i < table_pos.size(); i++) {
-            if(table_pos.at(i) == offset_cl) {
-              table_neg.at(offset_cl) = i;
-              break;
+        // FIND THE CELL OFFSET
+        auto offset_cl = offset(msh,cl);
+        auto TN = table_neg.at(offset_cl);
+        auto TP = table_pos.at(offset_cl);
+        if (TN == -1) {    
+            if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {  
+                for(size_t i = 0; i < table_pos.size(); i++) {
+                    if(table_pos.at(i) == offset_cl) {
+                        table_neg.at(offset_cl) = i;
+                    break;
+                    }
+                }
             }
-          }
         }
-      }
-      if (TP == -1) {
-        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) { 
-          for(size_t i = 0; i < table_neg.size(); i++) {
-            if(table_neg.at(i) == offset_cl) {
-              table_pos.at(offset_cl) = i;
-              break;
+        if (TP == -1) {
+            if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) { 
+                for(size_t i = 0; i < table_neg.size(); i++) {
+                    if(table_neg.at(i) == offset_cl) {
+                        table_pos.at(offset_cl) = i;
+                    break;
+                    }
+                }
             }
-          }
         }
-      }
     }
-
-
     // FILLING THE STRUCTURE dependent_cells 
     for (auto &cl : msh.cells) {
-      auto offset_cl = offset(msh,cl);
-      for(size_t i = 0; i < table_pos.size(); i++) {
-        if(table_pos.at(i) == offset_cl) {
-          size_t TN = table_neg.at(offset_cl);
-          cl.user_data.dependent_cells.insert(TN);
+        auto offset_cl = offset(msh,cl);
+        for(size_t i = 0; i < table_pos.size(); i++) {
+            if(table_pos.at(i) == offset_cl) {
+                size_t TN = table_neg.at(offset_cl);
+                cl.user_data.dependent_cells_pos.insert(i);
+            }
         }
-      }
-      for(size_t i = 0; i < table_neg.size(); i++) {
-        if(table_neg.at(i) == offset_cl) {
-          cl.user_data.dependent_cells.insert(i);
+        for(size_t i = 0; i < table_neg.size(); i++) {
+                if(table_neg.at(i) == offset_cl) {
+                cl.user_data.dependent_cells_neg.insert(i);
+            }
         }
-      }
     }
-
-    output_agglo_lists_step4(msh, table_neg, table_pos, "agglo_four.okc");
+    std::vector<int> table;
+    table.resize(nb_cells);
+    for(size_t i=0; i < nb_cells; i++) {
+        table.at(i) = -1;
+    }
+    output_agglo_lists_step4(msh, table_neg, table, "agglo_four.okc");
+    output_agglo_lists_step4(msh, table, table_pos, "agglo_five.okc");
 
 }
 

@@ -471,7 +471,7 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
             const auto dp_fc = dp_fcs[i];
             const auto dp_n  = dp_ns[i];
             cut_face_basis<Mesh,T> fb(msh, dp_fc, facdeg, element_location::IN_NEGATIVE_SIDE);
-            const auto qps_f = integrate(msh, dp_fc, facdeg + std::max(facdeg, celdeg), element_location::IN_NEGATIVE_SIDE);
+            const auto qps_f = integrate(msh, dp_fc, facdeg + std::max(facdeg, celdeg), element_location::IN_NEGATIVE_SIDE); // where relatif à T pas à S
             size_t cp_f = 0; 
             for (auto& qp : qps_f) {
                 const vector_type c_phi      = cb.eval_basis(qp.first);

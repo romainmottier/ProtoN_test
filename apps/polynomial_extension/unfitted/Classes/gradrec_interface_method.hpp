@@ -27,13 +27,18 @@ public:
         auto celdeg = hdi.cell_degree();
         auto cbs = cell_basis<Mesh,T>::size(celdeg);
 
-        // GR
-        T factor = 0.0;
-        if (1.0/(parms.kappa_1) < 1.0/(parms.kappa_2)) {
-            factor = 1.0;
+        // Gradient Reconstruction : initialisation for TOK
+        auto gr_n = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
+        auto gr_p = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {// remplacer element_location par i ou bar{i}
+            gr_n = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
+            gr_p = make_hho_gradrec_vector_interface_extended(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
         }
-        auto gr_n = make_hho_gradrec_vector_interface_extended(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE, 1.0-factor);
-        auto gr_p = make_hho_gradrec_vector_interface_extended(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE, factor);
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
+            gr_n = make_hho_gradrec_vector_interface_extended(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
+            gr_p = make_hho_gradrec_vector_interface_extended(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
+        }
+
 
         // stab
         auto stab_parms = test_case.parms;

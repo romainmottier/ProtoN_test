@@ -97,7 +97,7 @@ void CutHHOSecondOrderConvTest(int argc, char **argv){
         // ################################################## Loop over level of space refinement 
         // ##################################################
 
-        for(size_t l = 0; l <= l_divs; l++){
+        for(size_t l = l_divs; l <= l_divs; l++){
 
             std::cout << bold << cyan << "      Space refinment level -l : " << l << reset << std::endl;
 
@@ -110,6 +110,7 @@ void CutHHOSecondOrderConvTest(int argc, char **argv){
                 output_mesh_info(msh, level_set_function);
             }
             auto test_case = make_test_case_laplacian_conv(msh, level_set_function);
+            return;
             auto method = make_gradrec_interface_method(msh, 1.0, test_case);
             
             std::vector<std::pair<size_t,size_t>> cell_basis_data = create_kg_and_mg_cuthho_interface(msh, hdi, method, test_case, Kg, Mg);

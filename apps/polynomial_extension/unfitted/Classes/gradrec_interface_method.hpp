@@ -27,25 +27,28 @@ public:
         auto celdeg = hdi.cell_degree();
         auto cbs = cell_basis<Mesh,T>::size(celdeg);
 
-        // Gradient Reconstruction : initialisation for TOK
+        // Gradient Reconstruction : initialization for TOK
         auto gr_n = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
         auto gr_p = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
-        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {// remplacer element_location par i ou bar{i}
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
             gr_n = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
-            gr_p = make_hho_gradrec_vector_interface_extended(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
+            gr_p = make_hho_gradrec_vector_interface_TKOibar(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
         }
         if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-            gr_n = make_hho_gradrec_vector_interface_extended(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
-            gr_p = make_hho_gradrec_vector_interface_extended(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
+            gr_n = make_hho_gradrec_vector_interface_TKOibar(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
+            gr_p = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
         }
 
 
-        // stab
+        // Stabilisation: initialization for TOK
         auto stab_parms = test_case.parms;
         stab_parms.kappa_1 = 1.0/(parms.kappa_1);// rho_1 = kappa_1
         stab_parms.kappa_2 = 1.0/(parms.kappa_2);// rho_2 = kappa_2
         Mat stab = make_hho_stabilization_interface(msh, cl, level_set_function, hdi, stab_parms);
-        
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
+        }
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
+        }        
         T penalty_scale = std::min(1.0/(parms.kappa_1), 1.0/(parms.kappa_2));
         Mat penalty = make_hho_cut_interface_penalty(msh, cl, hdi, eta).block(0, 0, cbs, cbs);
         stab.block(0, 0, cbs, cbs)     += penalty_scale* penalty;
@@ -58,36 +61,24 @@ public:
         ///////////////    RHS
         Vect f = Vect::Zero(lc.rows());
         // neg part
-        f.block(0, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun,
-                                          element_location::IN_NEGATIVE_SIDE);
+        f.block(0, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun, element_location::IN_NEGATIVE_SIDE);
         // we use element_location::IN_POSITIVE_SIDE to get rid of the Nitsche term
         // (see definition of make_Dirichlet_jump)
-        f.head(cbs) -= parms.kappa_1 *
-            make_Dirichlet_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE,
-                                level_set_function, dir_jump, eta);
+        f.head(cbs) -= parms.kappa_1*make_Dirichlet_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE, level_set_function, dir_jump, eta);
 
         // pos part
-        f.block(cbs, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun,
-                                           element_location::IN_POSITIVE_SIDE);
-        f.block(cbs, 0, cbs, 1) += parms.kappa_1 *
-            make_Dirichlet_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE,
-                                level_set_function, dir_jump, eta);
-        f.block(cbs, 0, cbs, 1)
-            += make_flux_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE,
-                                    test_case.neumann_jump);
-
+        f.block(cbs, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun, element_location::IN_POSITIVE_SIDE);
+        f.block(cbs, 0, cbs, 1) += parms.kappa_1*make_Dirichlet_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE, level_set_function, dir_jump, eta);
+        f.block(cbs, 0, cbs, 1) += make_flux_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE, test_case.neumann_jump);
 
         // rhs term with GR
         auto gbs = vector_cell_basis<cuthho_poly_mesh<T>,T>::size(hdi.grad_degree());
         vector_cell_basis<cuthho_poly_mesh<T>, T> gb( msh, cl, hdi.grad_degree() );
         Matrix<T, Dynamic, 1> F_bis = Matrix<T, Dynamic, 1>::Zero( gbs );
-        auto iqps = integrate_interface(msh, cl, 2*hdi.grad_degree(),
-                                        element_location::IN_NEGATIVE_SIDE);
-        for (auto& qp : iqps)
-        {
+        auto iqps = integrate_interface(msh, cl, 2*hdi.grad_degree(), element_location::IN_NEGATIVE_SIDE);
+        for (auto& qp : iqps) {
             const auto g_phi    = gb.eval_basis(qp.first);
             const Matrix<T,2,1> n      = level_set_function.normal(qp.first);
-
             F_bis += qp.second * dir_jump(qp.first) * g_phi * n;
         }
         f -= F_bis.transpose() * (parms.kappa_1 * gr_n.first );
@@ -109,23 +100,9 @@ public:
         ///////////////    RHS
         Vect f = Vect::Zero(cbs*2);
         // neg part
-        f.block(0, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun,
-                                          element_location::IN_NEGATIVE_SIDE);
-//        // we use element_location::IN_POSITIVE_SIDE to get rid of the Nitsche term
-//        // (see definition of make_Dirichlet_jump)
-//        f.head(cbs) -= parms.kappa_1 *
-//            make_Dirichlet_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE,
-//                                level_set_function, dir_jump, eta);
-
+        f.block(0, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun, element_location::IN_NEGATIVE_SIDE);
         // pos part
-        f.block(cbs, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun,
-                                           element_location::IN_POSITIVE_SIDE);
-//        f.block(cbs, 0, cbs, 1) += parms.kappa_1 *
-//            make_Dirichlet_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE,
-//                                level_set_function, dir_jump, eta);
-//        f.block(cbs, 0, cbs, 1)
-//            += make_flux_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE,
-//                                    test_case.neumann_jump);
+        f.block(cbs, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun, element_location::IN_POSITIVE_SIDE);
 
         return f;
     }

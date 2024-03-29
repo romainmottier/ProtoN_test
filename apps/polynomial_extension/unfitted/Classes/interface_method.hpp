@@ -34,15 +34,14 @@ public:
             kappa = test_case.parms.kappa_2;
         
         auto level_set_function = test_case.level_set_;
-
         auto gr  = make_hho_gradrec_vector_extended(msh, cl, hdi, level_set_function);
-        Mat stab = make_hho_naive_stabilization(msh, cl, hdi);
-        Mat lc   = kappa * (gr.second + stab);
+        Mat stab = make_hho_naive_stabilization_extended(msh, cl, hdi);
+        Mat lc   = kappa * (gr.second + stab);    
         Mat f    = make_rhs(msh, cl, hdi.cell_degree(), test_case.rhs_fun);
-        
-//        std::cout << "r = " << gr.second << std::endl;
-//        std::cout << "s = " << stab << std::endl;
-//        std::cout << "f = " << f << std::endl;
+
+        //  std::cout << "r = " << gr.second << std::endl;
+        //  std::cout << "s = " << stab << std::endl;
+        //  std::cout << "f = " << f << std::endl;
         
         return std::make_pair(lc, f);
     }
@@ -58,8 +57,10 @@ public:
     std::pair<Mat, Vect>
     make_contrib(const Mesh& msh, const typename Mesh::cell_type& cl,
                  const testType &test_case, const hho_degree_info hdi) {
-        if( location(msh, cl) != element_location::ON_INTERFACE )
+
+        if (location(msh, cl) != element_location::ON_INTERFACE)
             return make_contrib_uncut(msh, cl, hdi, test_case);
+
         else // on interface
             return make_contrib_cut(msh, cl, test_case, hdi);
     }
@@ -76,10 +77,13 @@ public:
     Mat
     make_contrib_mass(const Mesh& msh, const typename Mesh::cell_type& cl,
                  const testType &test_case, const hho_degree_info hdi) {
-        if( location(msh, cl) != element_location::ON_INTERFACE )
+
+        if (location(msh, cl) != element_location::ON_INTERFACE)
             return make_contrib_uncut_mass(msh, cl, hdi, test_case);
+
         else // on interface
             return make_contrib_cut_mass(msh, cl, hdi, test_case);
+
     }
 
     Mat
@@ -99,10 +103,8 @@ public:
     make_contrib_cut_mass(const Mesh& msh, const typename Mesh::cell_type& cl,
                        const hho_degree_info hdi, const testType &test_case) {
 
-        Mat mass_neg = make_mass_matrix(msh, cl,
-                                        hdi.cell_degree(), element_location::IN_NEGATIVE_SIDE);
-        Mat mass_pos = make_mass_matrix(msh, cl,
-                                        hdi.cell_degree(), element_location::IN_POSITIVE_SIDE);
+        Mat mass_neg = make_mass_matrix(msh, cl, hdi.cell_degree(), element_location::IN_NEGATIVE_SIDE);
+        Mat mass_pos = make_mass_matrix(msh, cl, hdi.cell_degree(), element_location::IN_POSITIVE_SIDE);
         mass_neg *= (1.0/(test_case.parms.c_1*test_case.parms.c_1*test_case.parms.kappa_1));
         mass_pos *= (1.0/(test_case.parms.c_2*test_case.parms.c_2*test_case.parms.kappa_2));
         

@@ -37,7 +37,7 @@ create_kg_and_mg_cuthho_interface(const Mesh& msh, hho_degree_info & hdi, meth &
       size_t n_dof = assembler.n_dof(msh,cell);
       Matrix<RealType, Dynamic, Dynamic> mass = Matrix<RealType, Dynamic, Dynamic>::Zero(n_dof,n_dof);
       mass.block(0,0,cell_mass.rows(),cell_mass.cols()) = cell_mass;
-      assembler.assemble(msh, cell, lc, f);
+      assembler.assemble_ex(msh, cell, lc, f);
       assembler.assemble_mass(msh, cell, mass);
       cell_ind++;
     }

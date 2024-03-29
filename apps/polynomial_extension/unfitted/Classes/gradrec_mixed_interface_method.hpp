@@ -31,9 +31,9 @@ public:
         auto rbs = vector_cell_basis<Mesh,T>::size(graddeg);
 
         // GR
-        auto gr_n = make_hho_gradrec_mixed_vector_interface_extended(msh, cl, level_set_function, hdi,
+        auto gr_n = make_hho_gradrec_mixed_vector_interface(msh, cl, level_set_function, hdi,
                                                       element_location::IN_NEGATIVE_SIDE, 1.0);
-        auto gr_p = make_hho_gradrec_mixed_vector_interface_extended(msh, cl, level_set_function, hdi,
+        auto gr_p = make_hho_gradrec_mixed_vector_interface(msh, cl, level_set_function, hdi,
                                                       element_location::IN_POSITIVE_SIDE, 0.0);
 
         // stab

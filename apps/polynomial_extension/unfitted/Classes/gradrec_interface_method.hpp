@@ -27,36 +27,53 @@ public:
         auto celdeg = hdi.cell_degree();
         auto cbs = cell_basis<Mesh,T>::size(celdeg);
 
-        // Gradient Reconstruction : initialization for TOK
-        auto gr_n = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
-        auto gr_p = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
-        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
-            gr_n = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
-            gr_p = make_hho_gradrec_vector_interface_TKOibar(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
-        }
-        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-            gr_n = make_hho_gradrec_vector_interface_TKOibar(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
-            gr_p = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
-        }
-
-
-        // Stabilisation: initialization for TOK
+        // Gradient Reconstruction 
+        std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>,
+                  Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>> gr_n;        
+        std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>,
+                  Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>> gr_p;
+        // Stabilization
+        Mat stab;
         auto stab_parms = test_case.parms;
         stab_parms.kappa_1 = 1.0/(parms.kappa_1);// rho_1 = kappa_1
-        stab_parms.kappa_2 = 1.0/(parms.kappa_2);// rho_2 = kappa_2
-        Mat stab = make_hho_stabilization_interface(msh, cl, level_set_function, hdi, stab_parms);
-        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
+        stab_parms.kappa_2 = 1.0/(parms.kappa_2);// rho_2 = kappa_2  
+
+        if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
+            // std::cout << "cellule TOK" << std::endl;
+            // Gradient reconstruction
+            gr_n = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE, 1.0);
+            gr_p = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE, 0.0);
+            // Stabilization
+            stab = make_hho_stabilization_interface_TOK(msh, cl, level_set_function, hdi, stab_parms);  
+        }
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) { // CELL 13 = TKONEG - 1er CAS A DEBUG
+            // std::cout << std::endl << std::endl << std::endl << std::endl << "DEBUG CELL TKONEG" << std::endl << std::endl << std::endl << std::endl;
+            // Gradient reconstruction
+            gr_n = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
+            gr_p = make_hho_gradrec_vector_interface_TKOibar(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE, 0.0);
+            // Stabilization
+            // std::cout << std::endl << "RECONSTRUCTION OK" << std::endl << std::endl;
+            stab = make_hho_stabilization_interface_TKO_NEG(msh, cl, level_set_function, hdi, stab_parms);  
         }
         if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-        }        
+            // std::cout << "DEBUG CELL TKOPOS" << std::endl;
+            // Gradient reconstruction 
+            gr_n = make_hho_gradrec_vector_interface_TKOibar(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE, 1.0);
+            gr_p = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
+            // Stabilization
+            stab = make_hho_stabilization_interface_TKO_POS(msh, cl, level_set_function, hdi, stab_parms);  
+        }
+
+        // Penalty
         T penalty_scale = std::min(1.0/(parms.kappa_1), 1.0/(parms.kappa_2));
         Mat penalty = make_hho_cut_interface_penalty(msh, cl, hdi, eta).block(0, 0, cbs, cbs);
-        stab.block(0, 0, cbs, cbs)     += penalty_scale* penalty;
+        stab.block(0, 0, cbs, cbs)     += penalty_scale * penalty;
         stab.block(0, cbs, cbs, cbs)   -= penalty_scale * penalty;
         stab.block(cbs, 0, cbs, cbs)   -= penalty_scale * penalty;
         stab.block(cbs, cbs, cbs, cbs) += penalty_scale * penalty;
 
-        Mat lc = stab + stab_parms.kappa_1 * gr_n.second + stab_parms.kappa_2 * gr_p.second;
+        // STAB + RECONSTRUCTION      
+        Mat lc = stab + stab_parms.kappa_1 * gr_n.second + stab_parms.kappa_2 * gr_p.second;  
         
         ///////////////    RHS
         Vect f = Vect::Zero(lc.rows());

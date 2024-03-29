@@ -309,8 +309,7 @@ template<typename T, size_t ET>
 Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>
 make_hho_cut_stabilization(const cuthho_mesh<T, ET>& msh,
                            const typename cuthho_mesh<T, ET>::cell_type& cl,
-                           const hho_degree_info& di, element_location where, bool scaled_Q = true)
-{
+                           const hho_degree_info& di, element_location where, bool scaled_Q = true) {
     if ( !is_cut(msh, cl) )
         return make_hho_naive_stabilization(msh, cl, di);
 
@@ -330,8 +329,7 @@ make_hho_cut_stabilization(const cuthho_mesh<T, ET>& msh,
 
     auto hT = diameter(msh, cl);
 
-    for (size_t i = 0; i < num_faces; i++)
-    {
+    for (size_t i = 0; i < num_faces; i++) {
         auto fc = fcs[i];
         // face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg);
         cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg, where);
@@ -343,11 +341,9 @@ make_hho_cut_stabilization(const cuthho_mesh<T, ET>& msh,
         oper.block(0, cbs+i*fbs, fbs, fbs) = -If;
 
         auto qps = integrate(msh, fc, facdeg + celdeg, where);
-        for (auto& qp : qps)
-        {
+        for (auto& qp : qps) {
             auto c_phi = cb.eval_basis(qp.first);
             auto f_phi = fb.eval_basis(qp.first);
-
             mass += qp.second * f_phi * f_phi.transpose();
             trace += qp.second * f_phi * c_phi.transpose();
         }
@@ -360,10 +356,275 @@ make_hho_cut_stabilization(const cuthho_mesh<T, ET>& msh,
         
         if (scaled_Q) {
             data += oper.transpose() * mass * oper * (1./hT);
-        }else{
+        }
+        else {
             data += oper.transpose() * mass * oper;
         }
     }
+
+    return data;
+}
+
+
+// make_hho_cut_stabilization
+// stabilization term on the faces
+template<typename T, size_t ET>
+Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>
+make_hho_cut_stabilization_TOK(const cuthho_mesh<T, ET>& msh,
+                           const typename cuthho_mesh<T, ET>::cell_type& cl,
+                           const hho_degree_info& di, element_location where, bool scaled_Q = true) {
+    if ( !is_cut(msh, cl) )
+        return make_hho_naive_stabilization(msh, cl, di);
+
+    auto celdeg = di.cell_degree();
+    auto facdeg = di.face_degree();
+
+    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
+    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
+
+    // Adding the faces of the dependent terms
+    auto fcs = faces(msh, cl);
+    auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+    auto dependent_cells = cl.user_data.dependent_cells_neg;
+    if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
+        nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+        dependent_cells = cl.user_data.dependent_cells_pos;
+    }
+    auto offset_cl = offset(msh,cl);
+    std::cout << "Stabilisation: " << offset_cl << std::endl;
+    std::cout << "Cell TOK: " << offset_cl << std::endl;
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        std::cout << "Positive side" << std::endl;
+    }
+    else {
+        std::cout << "Negative side" << std::endl;
+    }
+    std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
+    std::cout << "Dependent cells:   ";
+    for (auto& dp_cl : dependent_cells) {
+        std::cout << dp_cl << "  ";
+        auto dp_cell = msh.cells[dp_cl];
+        auto fcs_dp = faces(msh, dp_cell);
+        // fcs.push_back(fcs_dp);
+        // ns.push_back(ns_dp);
+        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+    }
+    std::cout << std::endl << std::endl;
+    const auto num_faces = fcs.size();
+
+    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(cbs+num_faces*fbs, cbs+num_faces*fbs);
+    Matrix<T, Dynamic, Dynamic> If = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
+
+    cell_basis<cuthho_mesh<T, ET>,T> cb(msh, cl, celdeg);
+
+    auto hT = diameter(msh, cl);
+
+    for (size_t i = 0; i < num_faces; i++) {
+        auto fc = fcs[i];
+        // face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg);
+        cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg, where);
+
+        Matrix<T, Dynamic, Dynamic> oper = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs+num_faces*fbs);
+        Matrix<T, Dynamic, Dynamic> mass = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
+        Matrix<T, Dynamic, Dynamic> trace = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs);
+
+        oper.block(0, cbs+i*fbs, fbs, fbs) = -If;
+
+        auto qps = integrate(msh, fc, facdeg + celdeg, where);
+        for (auto& qp : qps) {
+            auto c_phi = cb.eval_basis(qp.first);
+            auto f_phi = fb.eval_basis(qp.first);
+            mass += qp.second * f_phi * f_phi.transpose();
+            trace += qp.second * f_phi * c_phi.transpose();
+        }
+
+        if (qps.size() == 0) /* Avoid to invert a zero matrix */
+            continue;
+
+
+        oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
+        
+        if (scaled_Q) {
+            data += oper.transpose() * mass * oper * (1./hT);
+        }
+        else {
+            data += oper.transpose() * mass * oper;
+        }
+    }
+
+    return data;
+}
+
+
+// make_hho_cut_stabilization
+// stabilization term on the faces
+template<typename T, size_t ET>
+Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>
+make_hho_cut_stabilization_TKOi(const cuthho_mesh<T, ET>& msh,
+                           const typename cuthho_mesh<T, ET>::cell_type& cl,
+                           const hho_degree_info& di, element_location where, bool scaled_Q = true) {
+
+    if ( !is_cut(msh, cl) )
+        return make_hho_naive_stabilization(msh, cl, di);
+
+    auto celdeg = di.cell_degree();
+    auto facdeg = di.face_degree();
+
+    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
+    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
+
+    auto fcs = faces(msh, cl);
+    fcs.clear();
+    auto num_faces = 0;
+
+    auto offset_cl = offset(msh,cl);
+    std::cout << "Stabilization: " << std::endl;
+    std::cout << "Cell TKOi: " << offset_cl << std::endl;    
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        std::cout << "Positive side" << std::endl << std::endl;
+    }
+    else {
+        std::cout << "Negative side" << std::endl << std::endl;
+    }
+
+    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(cbs+num_faces*fbs, cbs+num_faces*fbs);
+    Matrix<T, Dynamic, Dynamic> If = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
+
+    cell_basis<cuthho_mesh<T, ET>,T> cb(msh, cl, celdeg);
+
+    auto hT = diameter(msh, cl);
+
+    for (size_t i = 0; i < num_faces; i++) {
+        auto fc = fcs[i];
+        // face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg);
+        cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg, where);
+
+        Matrix<T, Dynamic, Dynamic> oper = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs+num_faces*fbs);
+        Matrix<T, Dynamic, Dynamic> mass = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
+        Matrix<T, Dynamic, Dynamic> trace = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs);
+
+        oper.block(0, cbs+i*fbs, fbs, fbs) = -If;
+
+        auto qps = integrate(msh, fc, facdeg + celdeg, where);
+        for (auto& qp : qps) {
+            auto c_phi = cb.eval_basis(qp.first);
+            auto f_phi = fb.eval_basis(qp.first);
+            mass += qp.second * f_phi * f_phi.transpose();
+            trace += qp.second * f_phi * c_phi.transpose();
+        }
+
+        if (qps.size() == 0) /* Avoid to invert a zero matrix */
+            continue;
+
+
+        oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
+        
+        if (scaled_Q) {
+            data += oper.transpose() * mass * oper * (1./hT);
+        }
+        else {
+            data += oper.transpose() * mass * oper;
+        }
+    }
+
+    return data;
+}
+
+
+// make_hho_cut_stabilization
+// stabilization term on the faces
+template<typename T, size_t ET>
+Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>
+make_hho_cut_stabilization_TKOibar(const cuthho_mesh<T, ET>& msh,
+                           const typename cuthho_mesh<T, ET>::cell_type& cl,
+                           const hho_degree_info& di, element_location where, bool scaled_Q = true) {
+    if ( !is_cut(msh, cl) )
+        return make_hho_naive_stabilization(msh, cl, di);
+
+    auto celdeg = di.cell_degree();
+    auto facdeg = di.face_degree();
+
+    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
+    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
+
+    // Adding the faces of the dependent terms
+    auto fcs = faces(msh, cl);
+    auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+    auto dependent_cells = cl.user_data.dependent_cells_neg;
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+        dependent_cells = cl.user_data.dependent_cells_pos;
+    }
+    auto offset_cl = offset(msh,cl);
+    std::cout << "Cell: " << offset_cl << std::endl;
+    std::cout << "Stabilisation TKOibar in ";
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        std::cout << "positive side" << std::endl;
+    }
+    else {
+        std::cout << "negative side" << std::endl;
+    }
+    std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
+    std::cout << "Dependent cells:   ";
+    for (auto& dp_cl : dependent_cells) {
+        std::cout << dp_cl << "  ";
+        auto dp_cell = msh.cells[dp_cl];
+        auto fcs_dp = faces(msh, dp_cell);
+        // fcs.push_back(fcs_dp);
+        // ns.push_back(ns_dp);
+        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+    }
+    std::cout << std::endl;
+    const auto num_faces = fcs.size();
+    std::cout << "   Number of faces: " << num_faces << std::endl;
+    std::cout << "   CBS: " << cbs << std::endl;
+    std::cout << "   FBS: " << fbs << std::endl;
+    std::cout << "   CBS + N*FBS: " << cbs+num_faces*fbs << std::endl;
+
+
+    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(cbs+num_faces*fbs, cbs+num_faces*fbs);
+    Matrix<T, Dynamic, Dynamic> If = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
+
+    // std::cout << "   DATA SIZE initialisation: " << data.size() << std::endl;
+
+    cell_basis<cuthho_mesh<T, ET>,T> cb(msh, cl, celdeg);
+
+    auto hT = diameter(msh, cl);
+
+    for (size_t i = 0; i < num_faces; i++) {
+        auto fc = fcs[i];
+        // face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg);
+        cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg, where);
+
+        Matrix<T, Dynamic, Dynamic> oper = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs+num_faces*fbs);
+        Matrix<T, Dynamic, Dynamic> mass = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
+        Matrix<T, Dynamic, Dynamic> trace = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs);
+
+        oper.block(0, cbs+i*fbs, fbs, fbs) = -If;
+
+        auto qps = integrate(msh, fc, facdeg + celdeg, where);
+        for (auto& qp : qps) {
+            auto c_phi = cb.eval_basis(qp.first);
+            auto f_phi = fb.eval_basis(qp.first);
+            mass += qp.second * f_phi * f_phi.transpose();
+            trace += qp.second * f_phi * c_phi.transpose();
+        }
+
+        if (qps.size() == 0) /* Avoid to invert a zero matrix */
+            continue;
+
+
+        oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
+        
+        if (scaled_Q) {
+            data += oper.transpose() * mass * oper * (1./hT);
+        }
+        else {
+            data += oper.transpose() * mass * oper;
+        }
+    }
+
+    // std::cout << "   DATA SIZE: " << data.size() << std::endl;
 
     return data;
 }
@@ -411,7 +672,6 @@ make_hho_cut_interface_penalty(const cuthho_mesh<T, ET>& msh,
 }
 
 
-
 //// make_hho_stabilization_interface
 // stabilization terms on the faces
 template<typename T, size_t ET, typename Function>
@@ -420,7 +680,8 @@ make_hho_stabilization_interface(const cuthho_mesh<T, ET>& msh,
                                  const typename cuthho_mesh<T, ET>::cell_type& cl,
                                  const Function& level_set_function,
                                  const hho_degree_info& di,
-                                 const params<T>& parms = params<T>(), bool scaled_Q = true) {
+                                 const params<T>& parms = params<T>(), bool scaled_Q = true)
+{
     if ( !is_cut(msh, cl) )
         throw std::invalid_argument("The cell is not cut ...");
 
@@ -468,9 +729,201 @@ make_hho_stabilization_interface(const cuthho_mesh<T, ET>& msh,
 }
 
 
+//// make_hho_stabilization_interface
+// stabilization terms on the faces
+template<typename T, size_t ET, typename Function>
+Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>
+make_hho_stabilization_interface_TOK(const cuthho_mesh<T, ET>& msh,
+                                 const typename cuthho_mesh<T, ET>::cell_type& cl,
+                                 const Function& level_set_function,
+                                 const hho_degree_info& di,
+                                 const params<T>& parms = params<T>(), bool scaled_Q = true) {
+    if ( !is_cut(msh, cl) )
+        throw std::invalid_argument("The cell is not cut ...");
+
+    auto celdeg = di.cell_degree();
+    auto facdeg = di.face_degree();
+
+    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
+    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
+
+    // Adding the faces of the dependent terms
+    auto fcs = faces(msh, cl);
+    auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+    auto dependent_cells = cl.user_data.dependent_cells_neg;
+    if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
+        nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+        dependent_cells = cl.user_data.dependent_cells_pos;
+    }
+    for (auto& dp_cl : dependent_cells) {
+        std::cout << dp_cl << "  ";
+        auto dp_cell = msh.cells[dp_cl];
+        auto fcs_dp = faces(msh, dp_cell);
+        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+    }
+    std::cout << std::endl << std::endl;
+    const auto num_faces = fcs.size();
+
+    Matrix<T, Dynamic, Dynamic> data
+        = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs+2*num_faces*fbs, 2*cbs+2*num_faces*fbs);
+    // Matrix<T, Dynamic, Dynamic> If = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
+
+    cell_basis<cuthho_mesh<T, ET>,T> cb(msh, cl, celdeg);
+
+    auto hT = diameter(msh, cl);
+
+    Matrix<T, Dynamic, Dynamic> stab_n = make_hho_cut_stabilization_TOK(msh, cl, di, element_location::IN_NEGATIVE_SIDE, scaled_Q);
+    Matrix<T, Dynamic, Dynamic> stab_p = make_hho_cut_stabilization_TOK(msh, cl, di, element_location::IN_POSITIVE_SIDE, scaled_Q);    
+        
+    // cells--cells
+    data.block(0, 0, cbs, cbs) += parms.kappa_1 * stab_n.block(0, 0, cbs, cbs);
+    data.block(cbs, cbs, cbs, cbs) += parms.kappa_2 * stab_p.block(0, 0, cbs, cbs);
+    // cells--faces
+    data.block(0, 2*cbs, cbs, num_faces*fbs)
+        += parms.kappa_1 * stab_n.block(0, cbs, cbs, num_faces*fbs);
+    data.block(cbs, 2*cbs + num_faces*fbs, cbs, num_faces*fbs)
+        += parms.kappa_2 * stab_p.block(0, cbs, cbs, num_faces*fbs);
+    // faces--cells
+    data.block(2*cbs, 0, num_faces*fbs, cbs)
+        += parms.kappa_1 * stab_n.block(cbs, 0, num_faces*fbs, cbs);
+    data.block(2*cbs + num_faces*fbs, cbs, num_faces*fbs, cbs)
+        += parms.kappa_2 * stab_p.block(cbs, 0, num_faces*fbs, cbs);
+    // faces--faces
+    data.block(2*cbs, 2*cbs, num_faces*fbs, num_faces*fbs)
+        += parms.kappa_1 * stab_n.block(cbs, cbs, num_faces*fbs, num_faces*fbs);
+    data.block(2*cbs + num_faces*fbs, 2*cbs + num_faces*fbs, num_faces*fbs, num_faces*fbs)
+        += parms.kappa_2 * stab_p.block(cbs, cbs, num_faces*fbs, num_faces*fbs);
+
+    return data;
+}
+
+
+
+//// make_hho_stabilization_interface
+// stabilization terms on the faces
+template<typename T, size_t ET, typename Function>
+Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>
+make_hho_stabilization_interface_TKO_NEG(const cuthho_mesh<T, ET>& msh,
+                                 const typename cuthho_mesh<T, ET>::cell_type& cl,
+                                 const Function& level_set_function,
+                                 const hho_degree_info& di,
+                                 const params<T>& parms = params<T>(), bool scaled_Q = true) {
+    if ( !is_cut(msh, cl) )
+        throw std::invalid_argument("The cell is not cut ...");
+
+    auto celdeg = di.cell_degree();
+    auto facdeg = di.face_degree();
+
+    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
+    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
+
+    // Adding the faces of the dependent terms
+    auto fcs = faces(msh, cl);
+    auto nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+    auto dependent_cells = cl.user_data.dependent_cells_pos;
+    auto offset_cl = offset(msh,cl);
+    for (auto& dp_cl : dependent_cells) {
+        auto dp_cell = msh.cells[dp_cl];
+        auto fcs_dp = faces(msh, dp_cell);
+        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+    }
+    auto num_faces = fcs.size();
+
+    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs+num_faces*fbs, 2*cbs+num_faces*fbs);
+    // Matrix<T, Dynamic, Dynamic> If = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
+
+    cell_basis<cuthho_mesh<T, ET>,T> cb(msh, cl, celdeg);
+
+    auto hT = diameter(msh, cl);
+
+    Matrix<T, Dynamic, Dynamic> stab_p = make_hho_cut_stabilization_TKOibar(msh, cl, di, element_location::IN_POSITIVE_SIDE, scaled_Q);    
+    
+    // std::cout << "   Stabilisation size initialisation: " << data.size() << std::endl;
+    // cells--cells
+    data.block(cbs, cbs, cbs, cbs) += parms.kappa_2 * stab_p.block(0, 0, cbs, cbs);
+    // cells--faces
+    data.block(cbs, 2*cbs, cbs, num_faces*fbs) += parms.kappa_2 * stab_p.block(0, cbs, cbs, num_faces*fbs);
+    // faces--cells
+    data.block(2*cbs, cbs, num_faces*fbs, cbs) += parms.kappa_2 * stab_p.block(cbs, 0, num_faces*fbs, cbs);
+    // faces--faces
+    data.block(2*cbs, 2*cbs, num_faces*fbs, num_faces*fbs) += parms.kappa_2 * stab_p.block(cbs, cbs, num_faces*fbs, num_faces*fbs);
+
+    // std::cout << "   Stabilisation size : " << data.size() << std::endl << std::endl;
+
+    return data;
+
+}
+
+//// make_hho_stabilization_interface
+// stabilization terms on the faces
+template<typename T, size_t ET, typename Function>
+Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>
+make_hho_stabilization_interface_TKO_POS(const cuthho_mesh<T, ET>& msh,
+                                 const typename cuthho_mesh<T, ET>::cell_type& cl,
+                                 const Function& level_set_function,
+                                 const hho_degree_info& di,
+                                 const params<T>& parms = params<T>(), bool scaled_Q = true) {
+    if ( !is_cut(msh, cl) )
+        throw std::invalid_argument("The cell is not cut ...");
+
+    auto celdeg = di.cell_degree();
+    auto facdeg = di.face_degree();
+
+    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
+    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
+
+    // Adding the faces of the dependent terms
+    auto fcs = faces(msh, cl);
+    auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+    auto dependent_cells = cl.user_data.dependent_cells_neg;
+    if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
+        nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+        dependent_cells = cl.user_data.dependent_cells_pos;
+    }
+    for (auto& dp_cl : dependent_cells) {
+        std::cout << dp_cl << "  ";
+        auto dp_cell = msh.cells[dp_cl];
+        auto fcs_dp = faces(msh, dp_cell);
+        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+    }
+    std::cout << std::endl << std::endl;
+    const auto num_faces = fcs.size();
+
+    Matrix<T, Dynamic, Dynamic> data
+        = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs+2*num_faces*fbs, 2*cbs+2*num_faces*fbs);
+    // Matrix<T, Dynamic, Dynamic> If = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
+
+    cell_basis<cuthho_mesh<T, ET>,T> cb(msh, cl, celdeg);
+
+    auto hT = diameter(msh, cl);
+
+    Matrix<T, Dynamic, Dynamic> stab_n = make_hho_cut_stabilization_TKOibar(msh, cl, di, element_location::IN_NEGATIVE_SIDE, scaled_Q);
+    Matrix<T, Dynamic, Dynamic> stab_p = make_hho_cut_stabilization_TKOi(msh, cl, di, element_location::IN_POSITIVE_SIDE, scaled_Q);    
+        
+    // cells--cells
+    data.block(0, 0, cbs, cbs) += parms.kappa_1 * stab_n.block(0, 0, cbs, cbs);
+    data.block(cbs, cbs, cbs, cbs) += parms.kappa_2 * stab_p.block(0, 0, cbs, cbs);
+    // cells--faces
+    data.block(0, 2*cbs, cbs, num_faces*fbs)
+        += parms.kappa_1 * stab_n.block(0, cbs, cbs, num_faces*fbs);
+    data.block(cbs, 2*cbs + num_faces*fbs, cbs, num_faces*fbs)
+        += parms.kappa_2 * stab_p.block(0, cbs, cbs, num_faces*fbs);
+    // faces--cells
+    data.block(2*cbs, 0, num_faces*fbs, cbs)
+        += parms.kappa_1 * stab_n.block(cbs, 0, num_faces*fbs, cbs);
+    data.block(2*cbs + num_faces*fbs, cbs, num_faces*fbs, cbs)
+        += parms.kappa_2 * stab_p.block(cbs, 0, num_faces*fbs, cbs);
+    // faces--faces
+    data.block(2*cbs, 2*cbs, num_faces*fbs, num_faces*fbs)
+        += parms.kappa_1 * stab_n.block(cbs, cbs, num_faces*fbs, num_faces*fbs);
+    data.block(2*cbs + num_faces*fbs, 2*cbs + num_faces*fbs, num_faces*fbs, num_faces*fbs)
+        += parms.kappa_2 * stab_p.block(cbs, cbs, num_faces*fbs, num_faces*fbs);
+
+    return data;
+}
+
+
 ///////////////////////////    GRADREC     //////////////////////////////
-
-
 
 // coeff scales the interface term
 template<typename T, size_t ET, typename Function>
@@ -669,7 +1122,7 @@ std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>
 make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
                                   const typename cuthho_mesh<T, ET>::cell_type& cl,
                                   const Function& level_set_function, const hho_degree_info& di,
-                                  element_location where) {
+                                  element_location where, T coeff) {
 
     if ( !is_cut(msh, cl) )
         throw std::invalid_argument("The cell is not cut");
@@ -684,16 +1137,46 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
     cell_basis<cuthho_mesh<T, ET>,T>            cb(msh, cl, celdeg);
     vector_cell_basis<cuthho_mesh<T, ET>,T>     gb(msh, cl, graddeg);
 
-
     auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
     auto gbs = vector_cell_basis<cuthho_mesh<T, ET>,T>::size(graddeg);
 
-    const auto num_faces = faces(msh, cl).size();
+    // Adding the faces of the dependent terms
+    auto fcs = faces(msh, cl);
+    auto ns = normals(msh, cl);
+    auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+    auto dependent_cells = cl.user_data.dependent_cells_neg;
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+        dependent_cells = cl.user_data.dependent_cells_pos;
+    }
+    auto offset_cl = offset(msh,cl);
+    std::cout << "Reconstruction: " << offset_cl << std::endl;
+    std::cout << "Cell TOK: " << offset_cl << std::endl;
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        std::cout << "Positive side" << std::endl;
+    }
+    else {
+        std::cout << "Negative side" << std::endl;
+    }
+    std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
+    std::cout << "Dependent cells:   ";
+    for (auto& dp_cl : dependent_cells) {
+        std::cout << dp_cl << "  ";
+        auto dp_cell = msh.cells[dp_cl];
+        auto fcs_dp = faces(msh, dp_cell);
+        auto ns_dp  = normals(msh, dp_cell);
+        // fcs.push_back(fcs_dp);
+        // ns.push_back(ns_dp);
+        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+        ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
+    }
+    std::cout << std::endl << std::endl;
+    const auto num_faces = fcs.size();
 
-    matrix_type       rhs_tmp = matrix_type::Zero(gbs, cbs + num_faces * fbs);
-    matrix_type        gr_lhs = matrix_type::Zero(gbs, gbs);
-    matrix_type        gr_rhs = matrix_type::Zero(gbs, 2*cbs + 2*num_faces * fbs);
+    matrix_type rhs_tmp = matrix_type::Zero(gbs, cbs + num_faces * fbs);
+    matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
+    matrix_type gr_rhs = matrix_type::Zero(gbs, 2*cbs + 2*num_faces * fbs);
 
     // Cell term 
     const auto qps = integrate(msh, cl, celdeg - 1 + facdeg, where);
@@ -705,8 +1188,6 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
     }
 
     // Face term
-    const auto fcs = faces(msh, cl);
-    const auto ns = normals(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++) {
         const auto fc = fcs[i];
         const auto n  = ns[i];
@@ -722,12 +1203,12 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
             rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
         }
     }
-    if(where == element_location::IN_NEGATIVE_SIDE) {
+    if (where == element_location::IN_NEGATIVE_SIDE) {
         gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
         gr_rhs.block(0, 2*cbs, gbs, num_faces*fbs)
             += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
     }
-    else if( where == element_location::IN_POSITIVE_SIDE) {
+    else if ( where == element_location::IN_POSITIVE_SIDE) {
         gr_rhs.block(0, cbs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
         gr_rhs.block(0, 2*cbs + num_faces*fbs, gbs, num_faces*fbs)
                      += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
@@ -738,70 +1219,19 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
         matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
         const auto iqps = integrate_interface(msh, cl, celdeg + graddeg, element_location::IN_NEGATIVE_SIDE);
         for (auto& qp : iqps) {
-            const auto c_phi        = cb.eval_basis(qp.first);
-            const auto g_phi        = gb.eval_basis(qp.first);
+            const auto c_phi = cb.eval_basis(qp.first);
+            const auto g_phi = gb.eval_basis(qp.first);
             Matrix<T,2,1> n = level_set_function.normal(qp.first);
             const vector_type qp_g_phi_n = qp.second * g_phi * n;
-            interface_term.block(0 , 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
+            interface_term.block(0 , 0, gbs, cbs)   -= qp_g_phi_n * c_phi.transpose();
             interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n * c_phi.transpose();
         }
         gr_rhs.block(0, 0, gbs, 2*cbs) += interface_term;
     }
-
-    // Terms from dependant cells 
-    auto offset_cl = offset(msh,cl); // Offset of the current cell
-    // std::cout << "Cell: " << offset_cl << std::endl;
-    auto nb_dp_cl        = cl.user_data.dependent_cells_neg.size(); // Number of dependent cells 
-    auto dependent_cells = cl.user_data.dependent_cells_neg;   // Dependant cells 
-    if (where == element_location::IN_POSITIVE_SIDE) {
-        nb_dp_cl        = cl.user_data.dependent_cells_pos.size();  
-        dependent_cells = cl.user_data.dependent_cells_pos;
-    }
-    // std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
-    // std::cout << "Dependent cells:   ";
-    // LOOP ON DEPENDENT CELLS
-    for (auto& dp_cl : dependent_cells) {
-        // std::cout << dp_cl << "  ";
-        auto dp_cell = msh.cells[dp_cl];
-        const auto dp_fcs = faces(msh, dp_cell);
-        const auto dp_ns = normals(msh, dp_cell);
-        // DEPENDENT FACE TERMS
-        for (size_t i = 0; i < dp_fcs.size(); i++) {
-            const auto dp_fc = dp_fcs[i];
-            const auto dp_n  = dp_ns[i];
-            cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, dp_fc, facdeg, where);
-            const auto qps_f = integrate(msh, dp_fc, facdeg + std::max(facdeg, celdeg), where);
-            size_t cp_f = 0; 
-            for (auto& qp : qps_f) {
-                const vector_type c_phi      = cb.eval_basis(qp.first);
-                const vector_type f_phi      = fb.eval_basis(qp.first);
-                const auto        g_phi      = gb.eval_basis(qp.first);
-                const vector_type qp_g_phi_n = qp.second * g_phi * dp_n;
-                rhs_tmp.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose(); // offsets à changer 
-                rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose(); // good 
-            }
-            cp_f++;
-        }
-        if (where == element_location::IN_NEGATIVE_SIDE) {
-            // TERM ON THE INTERFACE ON THE DEPENDENT CELLS 
-            matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
-            const auto iqps = integrate_interface(msh, dp_cell, celdeg + graddeg, element_location::IN_NEGATIVE_SIDE);
-            for (auto& qp : iqps) {
-                const auto c_phi = cb.eval_basis(qp.first);
-                const auto g_phi = gb.eval_basis(qp.first);
-                Matrix<T,2,1> n = level_set_function.normal(qp.first);
-                const vector_type qp_g_phi_n = qp.second * g_phi * n;
-                interface_term.block(0 , 0, gbs, cbs)   -= qp_g_phi_n * c_phi.transpose();
-                interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n * c_phi.transpose();
-            }
-            gr_rhs.block(0, 0, gbs, 2*cbs) += interface_term;
-        }
-    }
-    // std::cout << std::endl << std::endl;
-    
+  
     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
-
+      
     return std::make_pair(oper, data);
 }
 
@@ -830,11 +1260,47 @@ make_hho_gradrec_vector_interface_TKOi(const cuthho_mesh<T, ET>& msh,
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
     auto gbs = vector_cell_basis<cuthho_mesh<T, ET>,T>::size(graddeg);
 
-    const auto num_faces = faces(msh, cl).size();
+    auto offset_cl = offset(msh,cl);
+    std::cout << "Cell: " << offset_cl << std::endl;
+    std::cout << "Reconstruction TKOi in ";
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        std::cout << "positive side" << std::endl;
+    }
+    else {
+        std::cout << "negative side" << std::endl;
+    }
 
-    matrix_type       rhs_tmp = matrix_type::Zero(gbs, cbs + num_faces * fbs);
-    matrix_type        gr_lhs = matrix_type::Zero(gbs, gbs);
-    matrix_type        gr_rhs = matrix_type::Zero(gbs, 2*cbs + 2*num_faces * fbs);
+    // Number of faces of the others faces 
+    auto fcs = faces(msh, cl);
+    auto nb_dp_cl = cl.user_data.dependent_cells_pos.size();
+    auto dependent_cells = cl.user_data.dependent_cells_pos;
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        nb_dp_cl = cl.user_data.dependent_cells_neg.size(); 
+        dependent_cells = cl.user_data.dependent_cells_neg;
+    }
+    std::cout << "Number of dependant cells of TKOibar cell: " << nb_dp_cl << std::endl;
+    std::cout << "Dependent cells:   ";
+    for (auto& dp_cl : dependent_cells) {
+        std::cout << dp_cl << "  ";
+        auto dp_cell = msh.cells[dp_cl];
+        auto fcs_dp = faces(msh, dp_cell);
+        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+    }
+    std::cout << std::endl;
+    const auto num_faces_TKOibar = fcs.size();
+    const auto num_faces_TKOi = 0;
+    const auto num_faces = num_faces_TKOi + num_faces_TKOibar;
+    // std::cout << "   Number of faces of TKOi: " << num_faces_TKOi << std::endl;
+    // std::cout << "   Number of faces of TKOibar: " << num_faces_TKOibar << std::endl;
+    // std::cout << "   Number of faces total: " << num_faces << std::endl;
+
+    matrix_type rhs_tmp = matrix_type::Zero(gbs, cbs + num_faces_TKOi*fbs);
+    matrix_type  gr_lhs = matrix_type::Zero(gbs, gbs);
+    matrix_type  gr_rhs = matrix_type::Zero(gbs, 2*cbs + num_faces*fbs);
+
+    // std::cout << "   rhs_tmp SIZE TKOI: " << rhs_tmp.size() << std::endl;
+    // std::cout << "   gr_lhs SIZE TKOI: " << gr_lhs.size() << std::endl;
+    // std::cout << "   gr_rhs SIZE TKOI: " << gr_rhs.size() << std::endl;
 
     // Cell term which involve pairing cell unknowns
     const auto qps = integrate(msh, cl, celdeg - 1 + facdeg, where);
@@ -846,17 +1312,16 @@ make_hho_gradrec_vector_interface_TKOi(const cuthho_mesh<T, ET>& msh,
     }
     if(where == element_location::IN_NEGATIVE_SIDE) {
         gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-        gr_rhs.block(0, 2*cbs, gbs, num_faces*fbs)
-            += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
     }
-    else if( where == element_location::IN_POSITIVE_SIDE) {
+    else if(where == element_location::IN_POSITIVE_SIDE) {
         gr_rhs.block(0, cbs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-        gr_rhs.block(0, 2*cbs + num_faces*fbs, gbs, num_faces*fbs)
-                     += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
     }
     
     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
+
+    // std::cout << "   OPER SIZE TKOI: " << oper.size() << std::endl;
+    // std::cout << "   DATA SIZE TKOI: " << data.size() << std::endl << std::endl;
 
     return std::make_pair(oper, data);
 }
@@ -867,7 +1332,7 @@ std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>
 make_hho_gradrec_vector_interface_TKOibar(const cuthho_mesh<T, ET>& msh,
                                   const typename cuthho_mesh<T, ET>::cell_type& cl,
                                   const Function& level_set_function, const hho_degree_info& di,
-                                  element_location where) {
+                                  element_location where, T coeff) {
 
     if ( !is_cut(msh, cl) )
         throw std::invalid_argument("The cell is not cut");
@@ -887,11 +1352,51 @@ make_hho_gradrec_vector_interface_TKOibar(const cuthho_mesh<T, ET>& msh,
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
     auto gbs = vector_cell_basis<cuthho_mesh<T, ET>,T>::size(graddeg);
 
-    const auto num_faces = faces(msh, cl).size();
+    // Adding the faces of the dependent terms
+    auto fcs = faces(msh, cl);
+    auto ns = normals(msh, cl);
+    auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+    auto dependent_cells = cl.user_data.dependent_cells_neg;
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+        dependent_cells = cl.user_data.dependent_cells_pos;
+    }
+    auto offset_cl = offset(msh,cl);
+    std::cout << "Cell: " << offset_cl << std::endl;    
+    std::cout << "Reconstruction TKOibar in ";
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        std::cout << "positive side" << std::endl;
+    }
+    else {
+        std::cout << "negative side" << std::endl;
+    }
+    std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
+    std::cout << "Dependent cells:   ";
+    for (auto& dp_cl : dependent_cells) {
+        std::cout << dp_cl << "  ";
+        auto dp_cell = msh.cells[dp_cl];
+        auto fcs_dp = faces(msh, dp_cell);
+        auto ns_dp  = normals(msh, dp_cell);
+        // fcs.push_back(fcs_dp);
+        // ns.push_back(ns_dp);
+        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+        ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
+    }
+    std::cout << std::endl;
+    const auto num_faces_TKOibar = fcs.size();
+    const auto num_faces_TKOi = 0;
+    const auto num_faces = num_faces_TKOi + num_faces_TKOibar;
+    // std::cout << "   Number of faces of TKOi: " << num_faces_TKOi << std::endl;
+    // std::cout << "   Number of faces of TKOibar: " << num_faces_TKOibar << std::endl;
+    // std::cout << "   Number of faces total: " << num_faces << std::endl;
 
-    matrix_type       rhs_tmp = matrix_type::Zero(gbs, cbs + num_faces * fbs);
-    matrix_type        gr_lhs = matrix_type::Zero(gbs, gbs);
-    matrix_type        gr_rhs = matrix_type::Zero(gbs, 2*cbs + 2*num_faces * fbs);
+    matrix_type rhs_tmp = matrix_type::Zero(gbs, cbs + num_faces_TKOibar*fbs);
+    matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
+    matrix_type gr_rhs = matrix_type::Zero(gbs, 2*cbs + num_faces*fbs);
+
+    // std::cout << "   rhs_tmp SIZE TKOIbar: " << rhs_tmp.size() << std::endl;
+    // std::cout << "   gr_lhs SIZE TKOIbar: " << gr_lhs.size() << std::endl;
+    // std::cout << "   gr_rhs SIZE TKOIbar: " << gr_rhs.size() << std::endl;
 
     // Cell term 
     const auto qps = integrate(msh, cl, celdeg - 1 + facdeg, where);
@@ -903,8 +1408,6 @@ make_hho_gradrec_vector_interface_TKOibar(const cuthho_mesh<T, ET>& msh,
     }
 
     // Face term
-    const auto fcs = faces(msh, cl);
-    const auto ns = normals(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++) {
         const auto fc = fcs[i];
         const auto n  = ns[i];
@@ -920,271 +1423,29 @@ make_hho_gradrec_vector_interface_TKOibar(const cuthho_mesh<T, ET>& msh,
             rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
         }
     }
-    if(where == element_location::IN_NEGATIVE_SIDE) {
-        gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-        gr_rhs.block(0, 2*cbs, gbs, num_faces*fbs)
-            += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
-    }
-    else if( where == element_location::IN_POSITIVE_SIDE) {
-        gr_rhs.block(0, cbs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-        gr_rhs.block(0, 2*cbs + num_faces*fbs, gbs, num_faces*fbs)
-                     += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
-    }
+    gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
+    gr_rhs.block(0, 2*cbs, gbs, num_faces*fbs) += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
 
-    // Interface term
+    // Interface term which invol pairing term
     if (where == element_location::IN_NEGATIVE_SIDE) {
         matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
         const auto iqps = integrate_interface(msh, cl, celdeg + graddeg, element_location::IN_NEGATIVE_SIDE);
         for (auto& qp : iqps) {
-            const auto c_phi        = cb.eval_basis(qp.first);
-            const auto g_phi        = gb.eval_basis(qp.first);
-            Matrix<T,2,1> n = level_set_function.normal(qp.first);
+            const auto c_phi = cb.eval_basis(qp.first);
+            const auto g_phi = gb.eval_basis(qp.first);
+            Matrix<T,2,1> n  = level_set_function.normal(qp.first);
             const vector_type qp_g_phi_n = qp.second * g_phi * n;
             interface_term.block(0 , 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
             interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n * c_phi.transpose();
         }
         gr_rhs.block(0, 0, gbs, 2*cbs) += interface_term;
     }
-
-    // Terms from dependant cells 
-    auto offset_cl = offset(msh,cl); // Offset of the current cell
-    // std::cout << "Cell: " << offset_cl << std::endl;
-    auto nb_dp_cl        = cl.user_data.dependent_cells_neg.size(); // Number of dependent cells 
-    auto dependent_cells = cl.user_data.dependent_cells_neg;   // Dependant cells 
-    if (where == element_location::IN_POSITIVE_SIDE) {
-        nb_dp_cl        = cl.user_data.dependent_cells_pos.size();  
-        dependent_cells = cl.user_data.dependent_cells_pos;
-    }
-    // std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
-    // std::cout << "Dependent cells:   ";
-    // LOOP ON DEPENDENT CELLS
-    for (auto& dp_cl : dependent_cells) {
-        // std::cout << dp_cl << "  ";
-        auto dp_cell = msh.cells[dp_cl];
-        const auto dp_fcs = faces(msh, dp_cell);
-        const auto dp_ns = normals(msh, dp_cell);
-        // DEPENDENT FACE TERMS
-        for (size_t i = 0; i < dp_fcs.size(); i++) {
-            const auto dp_fc = dp_fcs[i];
-            const auto dp_n  = dp_ns[i];
-            cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, dp_fc, facdeg, where);
-            const auto qps_f = integrate(msh, dp_fc, facdeg + std::max(facdeg, celdeg), where);
-            size_t cp_f = 0; 
-            for (auto& qp : qps_f) {
-                const vector_type c_phi      = cb.eval_basis(qp.first);
-                const vector_type f_phi      = fb.eval_basis(qp.first);
-                const auto        g_phi      = gb.eval_basis(qp.first);
-                const vector_type qp_g_phi_n = qp.second * g_phi * dp_n;
-                rhs_tmp.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose(); // offsets à changer 
-                rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose(); // good 
-            }
-            cp_f++;
-        }
-        if (where == element_location::IN_NEGATIVE_SIDE) {
-            // TERM ON THE INTERFACE ON THE DEPENDENT CELLS 
-            matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
-            const auto iqps = integrate_interface(msh, dp_cell, celdeg + graddeg, element_location::IN_NEGATIVE_SIDE);
-            for (auto& qp : iqps) {
-                const auto c_phi = cb.eval_basis(qp.first);
-                const auto g_phi = gb.eval_basis(qp.first);
-                Matrix<T,2,1> n = level_set_function.normal(qp.first);
-                const vector_type qp_g_phi_n = qp.second * g_phi * n;
-                interface_term.block(0 , 0, gbs, cbs)   -= qp_g_phi_n * c_phi.transpose();
-                interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n * c_phi.transpose();
-            }
-            gr_rhs.block(0, 0, gbs, 2*cbs) += interface_term;
-        }
-    }
-    // std::cout << std::endl << std::endl;
     
     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
 
-    return std::make_pair(oper, data);
-}
-
-
-template<typename T, size_t ET, typename Function>
-std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>>
-make_hho_gradrec_vector_interface_extended(const cuthho_mesh<T, ET>& msh,
-                                  const typename cuthho_mesh<T, ET>::cell_type& cl,
-                                  const Function& level_set_function, const hho_degree_info& di,
-                                  element_location where) {
-
-    if ( !is_cut(msh, cl) )
-        throw std::invalid_argument("The cell is not cut");
-
-    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, Dynamic, 1>       vector_type;
-
-    const auto celdeg  = di.cell_degree();
-    const auto facdeg  = di.face_degree();
-    const auto graddeg = di.grad_degree();
-
-    // Polynomial basis 
-    cell_basis<cuthho_mesh<T, ET>,T>            cb(msh, cl, celdeg);
-    vector_cell_basis<cuthho_mesh<T, ET>,T>     gb(msh, cl, graddeg);
-    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
-    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
-    auto gbs = vector_cell_basis<cuthho_mesh<T, ET>,T>::size(graddeg);
-
-    const auto num_faces = faces(msh, cl).size();
-
-    // Initialisation
-    matrix_type rhs_tmp = matrix_type::Zero(gbs, cbs + num_faces*fbs);
-    matrix_type gr_lhs = matrix_type::Zero(gbs, gbs); // Mass matrix
-    matrix_type gr_rhs = matrix_type::Zero(gbs, 2*cbs + 2*num_faces*fbs); //2*cbs*(nb_dp_cl+1) + 
-
-    // If T^i \in TKO1
-    if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
-        if (where == element_location::IN_NEGATIVE_SIDE) { // Equation (10a)
-
-        }
-        else {                                             // Equation (10b)
-            // cell term
-            const auto qps = integrate(msh, cl, celdeg - 1 + facdeg, where);
-            for (auto& qp : qps) {
-                const auto c_dphi = cb.eval_gradients(qp.first);
-                const auto g_phi  = gb.eval_basis(qp.first);
-                gr_lhs.block(0, 0, gbs, gbs) += qp.second * g_phi * g_phi.transpose();
-                rhs_tmp.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose();
-            }   
-            // Face term
-            const auto fcs = faces(msh, cl);
-            const auto ns  = normals(msh, cl);
-            for (size_t i = 0; i < fcs.size(); i++) {
-                const auto fc = fcs[i];
-                const auto n  = ns[i];
-                cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg, where);
-                const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg), where);
-                for (auto& qp : qps_f) {
-                    const vector_type c_phi      = cb.eval_basis(qp.first);
-                    const vector_type f_phi      = fb.eval_basis(qp.first);
-                    const auto        g_phi      = gb.eval_basis(qp.first);
-                    const vector_type qp_g_phi_n = qp.second * g_phi * n;
-                    rhs_tmp.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
-                    rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
-                }
-            }
-            // Term on the interface
-            matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
-            const auto iqps = integrate_interface(msh, cl, celdeg + graddeg, element_location::IN_NEGATIVE_SIDE);
-            for (auto& qp : iqps) {
-                const auto c_phi = cb.eval_basis(qp.first);
-                const auto g_phi = gb.eval_basis(qp.first);
-                Matrix<T,2,1> n = level_set_function.normal(qp.first);
-                const vector_type qp_g_phi_n = qp.second * g_phi * n;
-                interface_term.block(0 , 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
-                interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n * c_phi.transpose();
-            }
-            gr_rhs.block(0, 0, gbs, 2*cbs) += interface_term; 
-        }
-    }
-    // If T^i \in TKO2
-    else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-        if (where == element_location::IN_NEGATIVE_SIDE) { // Equation (10a)
-            //cell term
-            const auto qps = integrate(msh, cl, celdeg - 1 + facdeg, where);
-            for (auto& qp : qps) {
-                const auto c_dphi = cb.eval_gradients(qp.first);
-                const auto g_phi  = gb.eval_basis(qp.first);
-                gr_lhs.block(0, 0, gbs, gbs) += qp.second * g_phi * g_phi.transpose();
-                rhs_tmp.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose();
-            }
-            // Face term
-            const auto fcs = faces(msh, cl);
-            const auto ns  = normals(msh, cl);
-            for (size_t i = 0; i < fcs.size(); i++) {
-                const auto fc = fcs[i];
-                const auto n  = ns[i];
-                cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg, where);
-                const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg), where);
-                for (auto& qp : qps_f) {
-                    const vector_type c_phi      = cb.eval_basis(qp.first);
-                    const vector_type f_phi      = fb.eval_basis(qp.first);
-                    const auto        g_phi      = gb.eval_basis(qp.first);
-                    const vector_type qp_g_phi_n = qp.second * g_phi * n;
-                    rhs_tmp.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
-                    rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
-                }
-            }
-        }
-        else {                                             // Equation (10b)
-            
-        }
-    }
-    // If T^i \in TOK
-    else {
-
-    }
-    
-
-    // other terms
-    if(where == element_location::IN_NEGATIVE_SIDE) {
-        gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-        gr_rhs.block(0, 2*cbs, gbs, num_faces*fbs) += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
-    }
-    else if( where == element_location::IN_POSITIVE_SIDE) {
-        gr_rhs.block(0, cbs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-        gr_rhs.block(0, 2*cbs + num_faces*fbs, gbs, num_faces*fbs) += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
-    }
-
-    /////////////////////////////////////////////////////////////////////////////////////////////
-    // Terms from dependant cells // ajouter le if bad_cut_wrong_side
-
-        auto offset_cl = offset(msh,cl); // Offset of the current cell
-        // std::cout << "Cell: " << offset_cl << std::endl;
-        auto nb_dp_cl        = cl.user_data.dependent_cells_neg.size(); // Number of dependent cells 
-        auto dependent_cells = cl.user_data.dependent_cells_neg;   // Dependant cells 
-        if (where == element_location::IN_POSITIVE_SIDE) {
-            nb_dp_cl        = cl.user_data.dependent_cells_pos.size();  
-            dependent_cells = cl.user_data.dependent_cells_pos;
-        }
-        // std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
-        // std::cout << "Dependent cells:   ";
-        // LOOP ON DEPENDENT CELLS
-        for (auto& dp_cl : dependent_cells) {
-            // std::cout << dp_cl << "  ";
-            auto dp_cell = msh.cells[dp_cl];
-            const auto dp_fcs = faces(msh, dp_cell);
-            const auto dp_ns = normals(msh, dp_cell);
-            // DEPENDENT FACE TERMS
-            for (size_t i = 0; i < dp_fcs.size(); i++) {
-                const auto dp_fc = dp_fcs[i];
-                const auto dp_n  = dp_ns[i];
-                cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, dp_fc, facdeg, where);
-                const auto qps_f = integrate(msh, dp_fc, facdeg + std::max(facdeg, celdeg), where);
-                size_t cp_f = 0; 
-                for (auto& qp : qps_f) {
-                    const vector_type c_phi      = cb.eval_basis(qp.first);
-                    const vector_type f_phi      = fb.eval_basis(qp.first);
-                    const auto        g_phi      = gb.eval_basis(qp.first);
-                    const vector_type qp_g_phi_n = qp.second * g_phi * dp_n;
-                    rhs_tmp.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose(); // offsets à changer 
-                    rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose(); // good 
-                }
-                cp_f++;
-            }
-            // TERM ON THE INTERFACE ON THE DEPENDENT CELLS 
-            matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
-            const auto iqps = integrate_interface(msh, dp_cell, celdeg + graddeg, element_location::IN_NEGATIVE_SIDE);
-            for (auto& qp : iqps) {
-                const auto c_phi = cb.eval_basis(qp.first);
-                const auto g_phi = gb.eval_basis(qp.first);
-                Matrix<T,2,1> n = level_set_function.normal(qp.first);
-                const vector_type qp_g_phi_n = qp.second * g_phi * n;
-                interface_term.block(0 , 0, gbs, cbs)   -= qp_g_phi_n * c_phi.transpose();
-                interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n * c_phi.transpose();
-            }
-            gr_rhs.block(0, 0, gbs, 2*cbs) += interface_term;
-        }
-        // std::cout << std::endl << std::endl;
-    
-    // /////////////////////////////////////////////////////////////////////////////////////////////
-
-    matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
-    matrix_type data = gr_rhs.transpose() * oper;
+    // std::cout << "   OPER SIZE TKOIbar: " << oper.size() << std::endl;
+    // std::cout << "   DATA SIZE TKOIbar: " << data.size() << std::endl;
 
     return std::make_pair(oper, data);
 }
@@ -1293,160 +1554,6 @@ make_hho_gradrec_mixed_vector_interface(const cuthho_mesh<T, ET>& msh,
     return std::make_pair(oper, data_mixed);
     
 }
-
-
-
-template<typename T, size_t ET, typename Function>
-std::pair<   Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>,
-             Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>  >
-make_hho_gradrec_mixed_vector_interface_extended(const cuthho_mesh<T, ET>& msh,
-                                  const typename cuthho_mesh<T, ET>::cell_type& cl,
-                                  const Function& level_set_function, const hho_degree_info& di,
-                                  element_location where, T coeff) {
-
-    if ( !is_cut(msh, cl) )
-      throw std::invalid_argument("The cell is not cut");
-
-    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, Dynamic, 1>       vector_type;
-
-    const auto celdeg  = di.cell_degree();
-    const auto facdeg  = di.face_degree();
-    const auto graddeg = di.grad_degree();
-
-    // Polynomial basis 
-    cell_basis<cuthho_mesh<T, ET>,T>        cb(msh, cl, celdeg);    // scalar basis 
-    vector_cell_basis<cuthho_mesh<T, ET>,T> gb(msh, cl, graddeg);   // vectorial basis 
-    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
-    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
-    auto gbs = vector_cell_basis<cuthho_mesh<T, ET>,T>::size(graddeg);
-
-    const auto num_faces = faces(msh, cl).size();
-
-    // Initialisation 
-    matrix_type rhs_tmp = matrix_type::Zero(gbs, cbs + num_faces * fbs);
-    matrix_type  gr_lhs = matrix_type::Zero(gbs, gbs);
-    matrix_type  gr_rhs = matrix_type::Zero(gbs, 2*cbs + 2*num_faces * fbs);
-
-    // Cell terms 
-    const auto qps = integrate(msh, cl, celdeg - 1 + facdeg, where);
-    for (auto& qp : qps) {
-      const auto c_dphi = cb.eval_gradients(qp.first);
-      const auto g_phi  = gb.eval_basis(qp.first);
-      gr_lhs.block(0, 0, gbs, gbs) += qp.second * g_phi * g_phi.transpose();
-      rhs_tmp.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose();
-    }
-
-    // ADD FACE TERMS IF CELL T^i IS NOT IN TKO^i
-    if ( (cl.user_data.agglo_set!=cell_agglo_set::T_KO_NEG && where!=element_location::IN_NEGATIVE_SIDE) || 
-         (cl.user_data.agglo_set!=cell_agglo_set::T_KO_POS && where!=element_location::IN_POSITIVE_SIDE) ) {
-      const auto fcs = faces(msh, cl);
-      const auto ns = normals(msh, cl);
-      for (size_t i = 0; i < fcs.size(); i++) {
-        const auto fc = fcs[i];
-        const auto n  = ns[i];
-        // face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg);
-        cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg, where);
-        const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg), where);
-        for (auto& qp : qps_f) {
-          const vector_type c_phi      = cb.eval_basis(qp.first);
-          const vector_type f_phi      = fb.eval_basis(qp.first);
-          const auto        g_phi      = gb.eval_basis(qp.first);
-          const vector_type qp_g_phi_n = qp.second * g_phi * n;
-          rhs_tmp.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
-          rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
-        }
-      }
-    } 
-
-    // Term on the interface
-    matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
-    const auto iqps = integrate_interface(msh, cl, celdeg + graddeg, element_location::IN_NEGATIVE_SIDE);
-    for (auto& qp : iqps) {
-        const auto c_phi        = cb.eval_basis(qp.first);
-        const auto g_phi        = gb.eval_basis(qp.first);
-        Matrix<T,2,1> n = level_set_function.normal(qp.first);
-        const vector_type qp_g_phi_n = qp.second * g_phi * n;
-        interface_term.block(0 , 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
-        interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n * c_phi.transpose();
-    }
-    gr_rhs.block(0, 0, gbs, 2*cbs) += coeff * interface_term;
-    
-    // other terms
-    if (where == element_location::IN_NEGATIVE_SIDE) {
-        gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-        gr_rhs.block(0, 2*cbs, gbs, num_faces*fbs)
-            += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
-    }
-    else if ( where == element_location::IN_POSITIVE_SIDE) {
-        gr_rhs.block(0, cbs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-        gr_rhs.block(0, 2*cbs + num_faces*fbs, gbs, num_faces*fbs)
-                     += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
-    }
-
-    // /////////////////////////////////////////////////////////////////////////////////////////////
-    // // Terms from dependant cells 
-    // auto offset_cl = offset(msh,cl);
-    // auto nb_dp_cl = cl.user_data.dependent_cells.size();
-    // std::cout << "Cell: " << offset_cl << std::endl;
-    // std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
-    // std::cout << "Dependant cells:  ";
-    // // Loop on dependant cells 
-    // for (auto& dp_cl : cl.user_data.dependent_cells) {
-    //   std::cout << dp_cl << "  ";
-    //   auto dp_cell = msh.cells[dp_cl];
-    //   const auto dp_fcs = faces(msh, dp_cell);
-    //   const auto dp_ns = normals(msh, dp_cell);
-    //   // Dependent face's terms 
-    //   for (size_t i = 0; i < dp_fcs.size(); i++) {
-    //     const auto dp_fc = dp_fcs[i];
-    //     const auto dp_n  = dp_ns[i];
-    //     cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, dp_fc, facdeg, where);
-    //     const auto qps_f = integrate(msh, dp_fc, facdeg + std::max(facdeg, celdeg), where);
-    //     for (auto& qp : qps_f) {
-    //       const vector_type c_phi      = cb.eval_basis(qp.first);
-    //       const vector_type f_phi      = fb.eval_basis(qp.first);
-    //       const auto        g_phi      = gb.eval_basis(qp.first);
-    //       const vector_type qp_g_phi_n = qp.second * g_phi * dp_n;
-    //       rhs_tmp.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
-    //       rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
-    //     }
-    //   }
-    //   // Term on the interface of the dependant cells 
-    //   matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
-    //   const auto iqps = integrate_interface(msh, dp_cell, celdeg + graddeg, element_location::IN_NEGATIVE_SIDE);
-    //   for (auto& qp : iqps) {
-    //     const auto c_phi        = cb.eval_basis(qp.first);
-    //     const auto g_phi        = gb.eval_basis(qp.first);
-    //     Matrix<T,2,1> n = level_set_function.normal(qp.first);
-    //     const vector_type qp_g_phi_n = qp.second * g_phi * n;
-    //     interface_term.block(0 , 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
-    //     interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n * c_phi.transpose();
-    //   }
-    //   gr_rhs.block(0, 0, gbs, 2*cbs) += coeff * interface_term;
-    // }
-    // std::cout << std::endl << std::endl;
-    // /////////////////////////////////////////////////////////////////////////////////////////////
-
-    // Shrinking data
-    auto vec_cell_size = 2*gbs;
-    auto nrows = gr_rhs.cols()+vec_cell_size;
-    auto ncols = gr_rhs.cols()+vec_cell_size;
-    matrix_type data_mixed = matrix_type::Zero(nrows,ncols);
-    if(where == element_location::IN_NEGATIVE_SIDE) {
-        data_mixed.block(0, vec_cell_size, gbs, ncols-vec_cell_size) = -gr_rhs;
-        data_mixed.block(vec_cell_size, 0, nrows-vec_cell_size, gbs) = gr_rhs.transpose();
-    }
-    else if( where == element_location::IN_POSITIVE_SIDE) {
-        data_mixed.block(gbs, vec_cell_size, gbs, ncols-vec_cell_size) = -gr_rhs;
-        data_mixed.block(vec_cell_size, gbs, nrows-vec_cell_size, gbs) = gr_rhs.transpose();
-    }
-
-    matrix_type oper = gr_lhs.llt().solve(gr_rhs);
-    return std::make_pair(oper, data_mixed);
-    
-}
-
 
 ///////////////////////////  NITSCHE TERMS  /////////////////////////////
 

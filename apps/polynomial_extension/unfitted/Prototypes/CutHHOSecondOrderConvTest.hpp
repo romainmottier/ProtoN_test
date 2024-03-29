@@ -70,11 +70,11 @@ void CutHHOSecondOrderConvTest(int argc, char **argv){
     RealType radius = 1.0/3.0;
     RealType xc = 0.5;
     RealType yc = 0.5;
-    // auto level_set_function = circle_level_set<RealType>(radius, xc, yc);
+    auto level_set_function = circle_level_set<RealType>(radius, xc, yc);
 
     // Line level set function
     RealType line_y = 0.425;
-    auto level_set_function = line_level_set<RealType>(line_y);
+    // auto level_set_function = line_level_set<RealType>(line_y);
     
   // ##################################################
   // ################################################## Space discretization
@@ -115,11 +115,10 @@ void CutHHOSecondOrderConvTest(int argc, char **argv){
                 output_mesh_info(msh, level_set_function);
             }
             auto test_case = make_test_case_laplacian_conv(msh, level_set_function);
-            return;
             auto method = make_gradrec_interface_method(msh, 1.0, test_case);
             
             std::vector<std::pair<size_t,size_t>> cell_basis_data = create_kg_and_mg_cuthho_interface(msh, hdi, method, test_case, Kg, Mg);
-            
+
             // ##################################################
             // ################################################## Static condensation
             // ##################################################

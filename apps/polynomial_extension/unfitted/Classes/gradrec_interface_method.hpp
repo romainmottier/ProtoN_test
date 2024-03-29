@@ -39,24 +39,20 @@ public:
         stab_parms.kappa_2 = 1.0/(parms.kappa_2);// rho_2 = kappa_2  
 
         if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
-            // std::cout << "cellule TOK" << std::endl;
             // Gradient reconstruction
             gr_n = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE, 1.0);
             gr_p = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE, 0.0);
             // Stabilization
             stab = make_hho_stabilization_interface_TOK(msh, cl, level_set_function, hdi, stab_parms);  
         }
-        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) { // CELL 13 = TKONEG - 1er CAS A DEBUG
-            // std::cout << std::endl << std::endl << std::endl << std::endl << "DEBUG CELL TKONEG" << std::endl << std::endl << std::endl << std::endl;
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) { 
             // Gradient reconstruction
             gr_n = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
             gr_p = make_hho_gradrec_vector_interface_TKOibar(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE, 0.0);
             // Stabilization
-            // std::cout << std::endl << "RECONSTRUCTION OK" << std::endl << std::endl;
             stab = make_hho_stabilization_interface_TKO_NEG(msh, cl, level_set_function, hdi, stab_parms);  
         }
         if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-            // std::cout << "DEBUG CELL TKOPOS" << std::endl;
             // Gradient reconstruction 
             gr_n = make_hho_gradrec_vector_interface_TKOibar(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE, 1.0);
             gr_p = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
@@ -94,8 +90,8 @@ public:
         Matrix<T, Dynamic, 1> F_bis = Matrix<T, Dynamic, 1>::Zero( gbs );
         auto iqps = integrate_interface(msh, cl, 2*hdi.grad_degree(), element_location::IN_NEGATIVE_SIDE);
         for (auto& qp : iqps) {
-            const auto g_phi    = gb.eval_basis(qp.first);
-            const Matrix<T,2,1> n      = level_set_function.normal(qp.first);
+            const auto g_phi = gb.eval_basis(qp.first);
+            const Matrix<T,2,1> n = level_set_function.normal(qp.first);
             F_bis += qp.second * dir_jump(qp.first) * g_phi * n;
         }
         f -= F_bis.transpose() * (parms.kappa_1 * gr_n.first );

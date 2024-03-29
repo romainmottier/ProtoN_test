@@ -342,6 +342,8 @@ public:
 
         std::vector<assembly_index> asm_map;
 
+        std::cout << "ASSEMBLY" << std::endl;
+
         auto facdeg = di.face_degree();
         auto fbs = face_basis<Mesh,T>::size(facdeg);
 
@@ -349,6 +351,7 @@ public:
         auto fcs = faces(msh, cl);
         // Face extension 
         auto nb_dp_cl = cl.user_data.dependent_cells_neg.size() + cl.user_data.dependent_cells_pos.size();
+        std::cout << "Number of dependent cells: " << nb_dp_cl << std::endl;
         auto dependent_cells = cl.user_data.dependent_cells_neg;
         auto offset_cl = offset(msh,cl);
         for (auto& dp_cl : dependent_cells) {
@@ -356,7 +359,7 @@ public:
             auto fcs_dp = faces(msh, dp_cell);
             fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
         }
-        dependent_cells = cl.user_data.dependent_cells_neg;
+        dependent_cells = cl.user_data.dependent_cells_pos;
         for (auto& dp_cl : dependent_cells) {
             auto dp_cell = msh.cells[dp_cl];
             auto fcs_dp = faces(msh, dp_cell);
@@ -366,9 +369,10 @@ public:
 
         auto f_dofs = num_faces * fbs;
         auto cbs = loc_cbs;
-        auto loc_size = cbs + f_dofs;
-        if( double_unknowns )
-            // loc_size = 2 * loc_size;
+        std::cout << "CBS  = "  << cbs << std::endl;
+        std::cout << "FBS  = "  << fbs <<std::endl;
+        auto loc_size = 2*cbs + f_dofs;
+        std::cout << "NDOFS: " << loc_size << std::endl;
         asm_map.reserve( loc_size );
 
         size_t cell_offset = cell_table.at( offset(msh, cl) );

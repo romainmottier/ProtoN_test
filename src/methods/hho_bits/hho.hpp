@@ -475,6 +475,7 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
     auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
     auto dependent_cells = cl.user_data.dependent_cells_neg;
     if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
+        std::cout << "Positive side" << std::endl;
         nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
         dependent_cells = cl.user_data.dependent_cells_pos;
     }
@@ -488,14 +489,11 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
         auto dp_cell = msh.cells[dp_cl];
         auto fcs_dp = faces(msh, dp_cell);
         auto ns_dp  = normals(msh, dp_cell);
-        // fcs.push_back(fcs_dp);
-        // ns.push_back(ns_dp);
         fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
         ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
     }
     std::cout << std::endl << std::endl;
 
-    // fcs = faces(msh, cl);
     const auto num_faces = fcs.size();
 
     matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);

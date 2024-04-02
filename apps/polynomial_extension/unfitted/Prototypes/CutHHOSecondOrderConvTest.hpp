@@ -67,7 +67,7 @@ void CutHHOSecondOrderConvTest(int argc, char **argv){
   // ##################################################
     
     // Circle level set function
-    RealType radius = 1.0/3.0;
+    RealType radius = 2.0;//1.0/3.0;
     RealType xc = 0.5;
     RealType yc = 0.5;
     auto level_set_function = circle_level_set<RealType>(radius, xc, yc);

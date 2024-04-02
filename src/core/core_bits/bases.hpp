@@ -177,7 +177,7 @@ public:
                 pos++;
             }
         }
-
+        // std::cout << "coucou" << std::endl;
         assert(pos == basis_size);
 
         return ret;

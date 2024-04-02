@@ -493,12 +493,12 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
         ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
     }
     std::cout << std::endl << std::endl;
-
     const auto num_faces = fcs.size();
 
     matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
     matrix_type gr_rhs = matrix_type::Zero(gbs, cbs + num_faces*fbs);
 
+    // cell term + mass matrix
     if(celdeg > 0) {
         const auto qps = integrate(msh, cl, celdeg - 1 + facdeg);
         for (auto& qp : qps) {
@@ -509,6 +509,7 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
         }
     }
 
+    // face term
     for (size_t i = 0; i < fcs.size(); i++) {
         const auto fc = fcs[i];
         const auto n  = ns[i];
@@ -521,6 +522,13 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
             const vector_type qp_g_phi_n = qp.second * g_phi * n;
             gr_rhs.block(0, cbs + i*fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
             gr_rhs.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
+        }
+    }
+
+    // Interface term
+    if (cl.user_data.location == element_location::IN_NEGATIVE_SIDE) {
+        for (auto& dp_cl : dependent_cells) {
+            
         }
     }
 

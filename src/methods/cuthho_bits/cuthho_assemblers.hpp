@@ -1326,6 +1326,7 @@ public:
         }
         else
         {
+            std::cout << "coucou" << std::endl;
             cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
         }
 
@@ -1358,21 +1359,57 @@ public:
 
         auto cell_offset = offset(msh, cl);
         size_t cell_SOL_offset;
+        std::vector< typename Mesh::face_type > fcs;
+        size_t num_faces;
+
         if (location(msh, cl) == element_location::ON_INTERFACE) {
-            if (where == element_location::IN_NEGATIVE_SIDE)
-                cell_SOL_offset = this->cell_table.at(cell_offset)*cbs;
-            else if (where == element_location::IN_POSITIVE_SIDE)
-                cell_SOL_offset = this->cell_table.at(cell_offset)*cbs + cbs;
-            else
-                throw std::invalid_argument("Invalid location");
+            if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
+                std::cout << "TOK" << std::endl;
+                if (where == element_location::IN_NEGATIVE_SIDE)
+                    cell_SOL_offset = this->cell_table.at(cell_offset)*cbs;
+                else if (where == element_location::IN_POSITIVE_SIDE)
+                    cell_SOL_offset = this->cell_table.at(cell_offset)*cbs + cbs;
+                else  throw std::invalid_argument("Invalid location");
+
+            }
+            if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
+                std::cout << "TKOneg" << std::endl;
+                if (where == element_location::IN_NEGATIVE_SIDE)
+                    cell_SOL_offset = this->cell_table.at(cell_offset)*cbs;
+                else if (where == element_location::IN_POSITIVE_SIDE)
+                    cell_SOL_offset = this->cell_table.at(cell_offset)*cbs + cbs;
+                else  throw std::invalid_argument("Invalid location");
+
+            }
+            if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
+                std::cout << "TKOpos" << std::endl;
+                if (where == element_location::IN_NEGATIVE_SIDE)
+                    cell_SOL_offset = this->cell_table.at(cell_offset)*cbs;
+                else if (where == element_location::IN_POSITIVE_SIDE)
+                    cell_SOL_offset = this->cell_table.at(cell_offset)*cbs + cbs;
+                else  throw std::invalid_argument("Invalid location");
+                
+            }
         }
         else
         {
             cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
+            // Adding the faces of the dependent terms
+            fcs = faces(msh, cl);
+            auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+            auto dependent_cells = cl.user_data.dependent_cells_neg;
+            if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
+                nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+                dependent_cells = cl.user_data.dependent_cells_pos;
+            }
+            for (auto& dp_cl : dependent_cells) {
+                auto dp_cell = msh.cells[dp_cl];
+                auto fcs_dp = faces(msh, dp_cell);
+                auto ns_dp  = normals(msh, dp_cell);
+                fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+            }
+            num_faces = fcs.size();
         }
-
-        auto fcs = faces(msh, cl);
-        auto num_faces = fcs.size();
 
         Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs + num_faces*fbs);
         ret.block(0, 0, cbs, 1) = solution.block(cell_SOL_offset, 0, cbs, 1);

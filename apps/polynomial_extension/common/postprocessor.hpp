@@ -317,8 +317,11 @@ public:
        RealType h = 10.0;
        std::vector<RealType> l2_error_vec(msh.cells.size());
        std::vector<RealType> flux_l2_error_vec(msh.cells.size());
-       for (auto& cell : msh.cells)
-       {
+       for (auto& cell : msh.cells) {
+
+        //    auto offset_cl = offset(msh,cell);
+        //    std::cout << "Postprocess of Uncut cells: " << offset_cl << std::endl;
+
            l2_error_vec[cell_i] = 0.0;
             RealType h_l = diameter(msh, cell);
            if (h_l < h) {
@@ -330,13 +333,14 @@ public:
            if ( location(msh, cell) == element_location::ON_INTERFACE )
            {
                
-               auto dofs_n = assembler.take_local_data(msh, cell, x_dof, element_location::IN_NEGATIVE_SIDE);
-               auto dofs_p = assembler.take_local_data(msh, cell, x_dof, element_location::IN_POSITIVE_SIDE);
+               auto dofs_n = assembler.take_local_data_extended(msh, cell, x_dof, element_location::IN_NEGATIVE_SIDE);
+               auto dofs_p = assembler.take_local_data_extended(msh, cell, x_dof, element_location::IN_POSITIVE_SIDE);
 
                auto cell_dofs_n = dofs_n.head(cbs);
                auto cell_dofs_p = dofs_p.head(cbs);
                
                // negative side
+               std::cout << "Postprocess of negative side" << std::endl;
                auto qps_n = integrate(msh, cell, 2*hho_di.cell_degree(), element_location::IN_NEGATIVE_SIDE);
                for (auto& qp : qps_n)
                {
@@ -358,6 +362,7 @@ public:
                }
                
                // positive side
+               std::cout << "Postprocess of negative side" << std::endl;
                auto qps_p = integrate(msh, cell, 2*hho_di.cell_degree(), element_location::IN_POSITIVE_SIDE);
                for (auto& qp : qps_p)
                {
@@ -375,13 +380,12 @@ public:
                    
                    /* Compute L2-error */
                    l2_error_vec[cell_i] += qp.second * (scal_fun(qp.first) - v) * (scal_fun(qp.first) - v);
-               }
-
-           }else{
+               }                   
+           }
+           else {
                
-               auto dofs = assembler.take_local_data(msh, cell, x_dof);
-                auto cell_dofs = dofs.head(cbs);
-
+               auto dofs = assembler.take_local_data_extended(msh, cell, x_dof);
+               auto cell_dofs = dofs.head(cbs);
                // uncut case
                auto qps = integrate(msh, cell, 2*hho_di.cell_degree());
                for (auto& qp : qps)
@@ -400,14 +404,13 @@ public:
                    
                    /* Compute L2-error */
                    l2_error_vec[cell_i] += qp.second * (scal_fun(qp.first) - v) * (scal_fun(qp.first) - v);
-                   
                }
            }
            cell_i++;
        }
        
-       scalar_l2_error = std::accumulate(l2_error_vec.begin(), flux_l2_error_vec.end(),0.0);
-       flux_l2_error = std::accumulate(l2_error_vec.begin(), flux_l2_error_vec.end(),0.0);
+       scalar_l2_error = std::accumulate(l2_error_vec.begin(), l2_error_vec.end(),0.0);
+       flux_l2_error   = std::accumulate(flux_l2_error_vec.begin(), flux_l2_error_vec.end(),0.0);
        tc.toc();
        
        std::cout << bold << yellow << "         Error completed: " << tc << " seconds" << reset << std::endl;
@@ -491,7 +494,8 @@ public:
                    l2_error_vec[cell_i] += qp.second * (scal_fun(qp.first) - v) * (scal_fun(qp.first) - v);
                }
 
-           }else{
+           }
+           else {
                
                auto dofs = assembler.take_local_data(msh, cell, x_dof);
                 auto cell_dofs = dofs.head(cbs);

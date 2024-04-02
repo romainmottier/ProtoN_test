@@ -748,28 +748,26 @@ make_hho_stabilization_interface_TOK(const cuthho_mesh<T, ET>& msh,
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
 
     // Adding the faces of the dependent terms
-    auto fcs_neg = faces(msh, cl);
+    auto fcs = faces(msh, cl);
+    size_t num_faces_neg = 0;
     auto nb_dp_cl_neg = cl.user_data.dependent_cells_neg.size();
     auto dependent_cells_neg = cl.user_data.dependent_cells_neg;
     for (auto& dp_cl : dependent_cells_neg) {
-        std::cout << dp_cl << "  ";
         auto dp_cell = msh.cells[dp_cl];
         auto fcs_dp = faces(msh, dp_cell);
-        fcs_neg.insert(fcs_neg.end(), fcs_dp.begin(), fcs_dp.end());
+        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+        num_faces_neg++;
     }
-    auto fcs_pos = faces(msh, cl);
+    size_t num_faces_pos = 0;
     auto nb_dp_cl_pos = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
     auto dependent_cells_pos = cl.user_data.dependent_cells_pos;
     for (auto& dp_cl : dependent_cells_pos) {
-        std::cout << dp_cl << "  ";
         auto dp_cell = msh.cells[dp_cl];
         auto fcs_dp = faces(msh, dp_cell);
-        fcs_pos.insert(fcs_pos.end(), fcs_dp.begin(), fcs_dp.end());
+        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+        num_faces_pos++;
     }
-    std::cout << std::endl << std::endl;
-    const auto num_faces_pos = fcs_pos.size();
-    const auto num_faces_neg = fcs_neg.size();
-    const auto num_faces     = num_faces_neg + num_faces_pos;
+    const auto num_faces = fcs.size();
 
     Matrix<T, Dynamic, Dynamic> data
         = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs+num_faces*fbs, 2*cbs+num_faces*fbs);

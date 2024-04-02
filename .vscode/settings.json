@@ -76,7 +76,9 @@
         "typeinfo": "cpp",
         "valarray": "cpp",
         "variant": "cpp",
-        "cholesky": "cpp"
+        "cholesky": "cpp",
+        "*.ipp": "cpp",
+        "geometry": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

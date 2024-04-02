@@ -1131,7 +1131,7 @@ int main(int argc, char **argv)
 {
 
   //    HeterogeneousFlowerICutHHOSecondOrder(argc, argv);
-      HeterogeneousFlowerICutHHOFirstOrder(argc, argv);
+    //   HeterogeneousFlowerICutHHOFirstOrder(argc, argv);
   //   HeterogeneousFlowerECutHHOFirstOrder(argc, argv);
     
   //    HeterogeneousGar6moreICutHHOSecondOrder(argc, argv);
@@ -1143,7 +1143,7 @@ int main(int argc, char **argv)
   //    ECutHHOFirstOrderCFL(argc, argv);
   //    ECutHHOFirstOrderEigenCFL(argc, argv);
     
-  //    CutHHOSecondOrderConvTest(argc, argv);
+     CutHHOSecondOrderConvTest(argc, argv);
   //    CutHHOFirstOrderConvTest(argc, argv);
     return 0;
 }

@@ -67,7 +67,7 @@ void CutHHOSecondOrderConvTest(int argc, char **argv){
   // ##################################################
     
     // Circle level set function
-    RealType radius = 2.0;//1.0/3.0;
+    RealType radius = 1.0/3.0;
     RealType xc = 0.5;
     RealType yc = 0.5;
     auto level_set_function = circle_level_set<RealType>(radius, xc, yc);
@@ -89,7 +89,7 @@ void CutHHOSecondOrderConvTest(int argc, char **argv){
     // ################################################## Loop over polynomial degree
     // ##################################################
 
-    for(size_t k = 0; k <= degree; k++){
+    for(size_t k = degree; k <= degree; k++){
 
         std::cout << std::endl; 
         std::cout << bold << red << "   Polynomial degree k : " << k << reset << std::endl;
@@ -169,7 +169,7 @@ void CutHHOSecondOrderConvTest(int argc, char **argv){
               std::string silo_file_name = "cut_steady_scalar_k_" + std::to_string(k) + "_";
               postprocessor<cuthho_poly_mesh<RealType>>::write_silo_one_field(silo_file_name, l, msh, hdi, assembler, x_dof, test_case.sol_fun, false);
             }
-            postprocessor<cuthho_poly_mesh<RealType>>::compute_errors_one_field(msh, hdi, assembler, x_dof, test_case.sol_fun, test_case.sol_grad,error_file);
+            postprocessor<cuthho_poly_mesh<RealType>>::compute_errors_one_field(msh, hdi, assembler, x_dof, test_case.sol_fun, test_case.sol_grad, error_file);
         }
         error_file << std::endl << std::endl;
     }

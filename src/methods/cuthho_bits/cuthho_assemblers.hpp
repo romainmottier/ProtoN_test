@@ -1593,6 +1593,18 @@ public:
             }
         }
     }
+
+    void project_over_cells_extended(const Mesh& msh, hho_degree_info hho_di, Matrix<T, Dynamic, 1> & x_glob, std::function<T(const typename Mesh::point_type& )> scal_fun){
+        
+        for (auto& cl : msh.cells)
+        {
+            if( location(msh, cl) != element_location::ON_INTERFACE ){
+                project_over_uncutcells_extended(msh, cl, hho_di, x_glob, scal_fun);
+            } else{ // on interface
+                project_over_cutcells_extended(msh, cl, hho_di, x_glob, scal_fun);
+            }
+        }
+    }
             
     void project_over_uncutcells(const Mesh& msh, const typename Mesh::cell_type& cl, hho_degree_info hho_di, Matrix<T, Dynamic, 1> & x_glob, std::function<T(const typename Mesh::point_type& )> scal_fun){
             
@@ -1602,6 +1614,18 @@ public:
         auto facdeg = this->di.face_degree();
         auto cbs = cell_basis<Mesh,T>::size(celdeg);
         auto fbs = face_basis<Mesh,T>::size(facdeg);
+        auto cell_offset        = offset(msh, cl);
+        size_t cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
+        x_glob.block(cell_SOL_offset, 0, cbs, 1) = x_proj_dof.block(0, 0, cbs, 1);
+    }
+
+    void project_over_uncutcells_extended(const Mesh& msh, const typename Mesh::cell_type& cl, hho_degree_info hho_di, Matrix<T, Dynamic, 1> & x_glob, std::function<T(const typename Mesh::point_type& )> scal_fun){
+            
+        Matrix<T, Dynamic, 1> x_proj_dof = project_function_extended(msh, cl, hho_di, scal_fun);
+            
+        auto celdeg = this->di.cell_degree();
+        auto facdeg = this->di.face_degree();
+        auto cbs = cell_basis<Mesh,T>::size(celdeg);
         auto cell_offset        = offset(msh, cl);
         size_t cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
         x_glob.block(cell_SOL_offset, 0, cbs, 1) = x_proj_dof.block(0, 0, cbs, 1);
@@ -1617,6 +1641,22 @@ public:
         auto facdeg = this->di.face_degree();
         auto cbs = cell_basis<Mesh,T>::size(celdeg);
         auto fbs = face_basis<Mesh,T>::size(facdeg);
+        auto cell_offset        = offset(msh, cl);
+        size_t cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
+        x_glob.block(cell_SOL_offset, 0, cbs, 1) = x_neg_proj_dof.block(0, 0, cbs, 1);
+        x_glob.block(cell_SOL_offset+cbs, 0, cbs, 1) = x_pos_proj_dof.block(0, 0, cbs, 1);
+    
+    }
+
+    void project_over_cutcells_extended(const Mesh& msh, const typename Mesh::cell_type& cl, hho_degree_info hho_di, Matrix<T, Dynamic, 1> & x_glob, std::function<T(const typename Mesh::point_type& )> scal_fun){
+            
+        Matrix<T, Dynamic, 1> x_neg_proj_dof = project_function_extended(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
+            
+        Matrix<T, Dynamic, 1> x_pos_proj_dof = project_function_extended(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
+            
+        auto celdeg = this->di.cell_degree();
+        auto facdeg = this->di.face_degree();
+        auto cbs = cell_basis<Mesh,T>::size(celdeg);
         auto cell_offset        = offset(msh, cl);
         size_t cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
         x_glob.block(cell_SOL_offset, 0, cbs, 1) = x_neg_proj_dof.block(0, 0, cbs, 1);

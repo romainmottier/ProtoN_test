@@ -1899,6 +1899,49 @@ project_function(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET
 }
 
 
+template<typename T, size_t ET, typename Function>
+Matrix<T, Dynamic, 1>
+project_function_extended(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl,
+                 hho_degree_info hdi, element_location where, const Function& f)
+{
+    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(hdi.cell_degree());
+    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(hdi.face_degree());
+
+    auto fcs = faces(msh, cl);
+    auto num_faces = fcs.size();
+
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
+
+    if ( location(msh, cl) != element_location::ON_INTERFACE &&
+         location(msh, cl) != where )
+        return ret;
+
+    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), where);
+    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, hdi.cell_degree(), f, where);
+    
+    ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
+
+    for (size_t i = 0; i < num_faces; i++)
+    {
+        auto fc = fcs[i];
+
+        if ( location(msh, fc) != element_location::ON_INTERFACE &&
+             location(msh, fc) != where )
+        {
+            ret.block(cbs+i*fbs, 0, fbs, 1) = Matrix<T, Dynamic, 1>::Zero(fbs);
+        }
+        else
+        {
+            Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), where);
+            Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, hdi.face_degree(), where, f);
+            ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
+        }
+    }
+
+    return ret;
+}
+
+
 
 template<typename Mesh>
 class cut_assembler

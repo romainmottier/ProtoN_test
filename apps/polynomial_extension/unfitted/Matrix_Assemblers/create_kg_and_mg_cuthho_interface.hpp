@@ -71,20 +71,29 @@ test_operators(const Mesh& msh, hho_degree_info & hdi, meth &method, testType & 
     tc.tic();
     auto assembler = make_one_field_interface_assembler(msh, bcs_fun, hdi);
     std::vector<std::pair<size_t,size_t>> cell_basis_data = assembler.compute_cell_basis_data(msh);
+
+    // Verification size of the problem
     size_t cell_ind = 0;
+    size_t x_dof_global_size = 0;
+    size_t nb_theorique = 700;
     for (auto& cell : msh.cells) {
       auto contrib = method.make_contrib(msh, cell, test_case, hdi);
-      auto lc = contrib.first;
-      auto f = contrib.second;
-      auto cell_mass = method.make_contrib_mass(msh, cell, test_case, hdi);
-      size_t n_dof = assembler.n_dof(msh,cell);
-      Matrix<RealType, Dynamic, Dynamic> mass = Matrix<RealType, Dynamic, Dynamic>::Zero(n_dof,n_dof);
-      mass.block(0,0,cell_mass.rows(),cell_mass.cols()) = cell_mass;
-      assembler.assemble_ex(msh, cell, lc, f);
-      assembler.assemble_mass(msh, cell, mass);
+      x_dof_global_size += std::sqrt(contrib.first.size());
+      if (location(msh, cell) == element_location::ON_INTERFACE) {
+        nb_theorique += 7;
+      }
+      std::cout << "local_dof_size = " << std::sqrt(contrib.first.size()) << std::endl;
+      std::cout << "n_x_dofs = " << x_dof_global_size << std::endl;
+      std::cout << "Theorique number of dofs = " << nb_theorique << std::endl;
       cell_ind++;
     }
-    
+    // Verification Gradient reconstruction
+    Matrix<RealType, Dynamic, 1> x_dof_proj = Matrix<RealType, Dynamic, 1>::Zero(x_dof_global_size, 1);
+    for (auto& cell : msh.cells) {
+      assembler.project_over_cells_extended(msh, hdi, x_dof_proj, sol_fun);
+    }
+
+
     return cell_basis_data;
 }
 

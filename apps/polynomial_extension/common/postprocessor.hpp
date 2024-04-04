@@ -333,8 +333,8 @@ public:
            if ( location(msh, cell) == element_location::ON_INTERFACE )
            {
                
-               auto dofs_n = assembler.take_local_data_extended(msh, cell, x_dof, element_location::IN_NEGATIVE_SIDE);
-               auto dofs_p = assembler.take_local_data_extended(msh, cell, x_dof, element_location::IN_POSITIVE_SIDE);
+               auto dofs_n = assembler.take_local_data(msh, cell, x_dof, element_location::IN_NEGATIVE_SIDE);
+               auto dofs_p = assembler.take_local_data(msh, cell, x_dof, element_location::IN_POSITIVE_SIDE);
 
                auto cell_dofs_n = dofs_n.head(cbs);
                auto cell_dofs_p = dofs_p.head(cbs);
@@ -384,7 +384,7 @@ public:
            }
            else {
                
-               auto dofs = assembler.take_local_data_extended(msh, cell, x_dof);
+               auto dofs = assembler.take_local_data(msh, cell, x_dof);
                auto cell_dofs = dofs.head(cbs);
                // uncut case
                auto qps = integrate(msh, cell, 2*hho_di.cell_degree());
@@ -437,22 +437,28 @@ public:
        std::vector<RealType> l2_error_vec(msh.cells.size());
        std::vector<RealType> flux_l2_error_vec(msh.cells.size());
        for (auto& cell : msh.cells) {
+           
            l2_error_vec[cell_i] = 0.0;
-            RealType h_l = diameter(msh, cell);
+           RealType h_l = diameter(msh, cell);
            if (h_l < h) {
                h = h_l;
            }
            
+           auto offset_cl = offset(msh,cell);
+           std::cout << "Cell " << offset_cl << " : ";
+
            cell_basis<cuthho_poly_mesh<RealType>, RealType> cell_basis(msh, cell, hho_di.cell_degree());
            auto cbs = cell_basis.size();
            if (location(msh, cell) == element_location::ON_INTERFACE) {
+
+               std::cout << "CUT" << std::endl;
                
-               auto dofs_n = assembler.take_local_data(msh, cell, x_dof, element_location::IN_NEGATIVE_SIDE);
-               auto dofs_p = assembler.take_local_data(msh, cell, x_dof, element_location::IN_POSITIVE_SIDE);
+               auto dofs_n = assembler.take_local_data_extended(msh, cell, x_dof, element_location::IN_NEGATIVE_SIDE);
+               auto dofs_p = assembler.take_local_data_extended(msh, cell, x_dof, element_location::IN_POSITIVE_SIDE);
 
                auto cell_dofs_n = dofs_n.head(cbs);
                auto cell_dofs_p = dofs_p.head(cbs);
-               
+
                // negative side
                auto qps_n = integrate(msh, cell, 2*hho_di.cell_degree(), element_location::IN_NEGATIVE_SIDE);
                for (auto& qp : qps_n)
@@ -497,7 +503,9 @@ public:
            }
            else {
                
-               auto dofs = assembler.take_local_data(msh, cell, x_dof);
+               std::cout << "UNCUT" << std::endl;
+
+               auto dofs = assembler.take_local_data_extended(msh, cell, x_dof);
                 auto cell_dofs = dofs.head(cbs);
 
                // uncut case

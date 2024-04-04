@@ -68,8 +68,10 @@ public:
         stab.block(cbs, 0, cbs, cbs)   -= penalty_scale * penalty;
         stab.block(cbs, cbs, cbs, cbs) += penalty_scale * penalty;
 
-        // STAB + RECONSTRUCTION      
-        Mat lc = stab + stab_parms.kappa_1 * gr_n.second + stab_parms.kappa_2 * gr_p.second;  
+        // STAB + RECONSTRUCTION     
+        std::cout << "TEST 1 " << std::endl; 
+        Mat lc = stab + stab_parms.kappa_1 * gr_n.second + stab_parms.kappa_2 * gr_p.second; 
+        std::cout << "TEST 2 " << std::endl; 
         
         ///////////////    RHS
         Vect f = Vect::Zero(lc.rows());

@@ -793,8 +793,8 @@ public:
             
     Matrix<T, Dynamic, 1>
     get_solF(const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, 1>& solution)
-    {
+             const Matrix<T, Dynamic, 1>& solution) {
+
         bool double_unknowns = ( location(msh, cl) == element_location::ON_INTERFACE
                                  && loc_zone == element_location::ON_INTERFACE );
 
@@ -803,6 +803,7 @@ public:
         auto fcs = faces(msh, cl);
         auto num_faces = fcs.size();
         size_t f_dofs = num_faces*fbs;
+        
         if( double_unknowns )
             f_dofs = 2 * f_dofs;
 
@@ -851,6 +852,136 @@ public:
         }
         return solF;
     }
+
+    Matrix<T, Dynamic, 1>
+    get_solF_extended(const Mesh& msh, const typename Mesh::cell_type& cl,
+             const Matrix<T, Dynamic, 1>& solution) {
+
+        bool double_unknowns = ( location(msh, cl) == element_location::ON_INTERFACE
+                                 && loc_zone == element_location::ON_INTERFACE );
+
+        auto facdeg = di.face_degree();
+        auto fbs = face_basis<Mesh,T>::size(facdeg);
+        std::vector< typename Mesh::face_type > fcs;
+        size_t num_faces;
+
+        if (location(msh, cl) == element_location::ON_INTERFACE) {
+            if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
+                // Adding the faces of the dependent terms
+                fcs = faces(msh, cl);
+                size_t num_faces_neg = 0;
+                auto nb_dp_cl_neg = cl.user_data.dependent_cells_neg.size();
+                auto dependent_cells_neg = cl.user_data.dependent_cells_neg;
+                for (auto& dp_cl : dependent_cells_neg) {
+                    auto dp_cell = msh.cells[dp_cl];
+                    auto fcs_dp = faces(msh, dp_cell);
+                    fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+                    num_faces_neg++;
+                }
+                size_t num_faces_pos = 0;
+                auto nb_dp_cl_pos = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+                auto dependent_cells_pos = cl.user_data.dependent_cells_pos;
+                for (auto& dp_cl : dependent_cells_pos) {
+                    auto dp_cell = msh.cells[dp_cl];
+                    auto fcs_dp = faces(msh, dp_cell);
+                    fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+                    num_faces_pos++;
+                }
+                num_faces = fcs.size();
+            }
+            if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
+                // Adding the faces of the dependent terms
+                fcs = faces(msh, cl);
+                auto nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+                auto dependent_cells = cl.user_data.dependent_cells_pos;
+                for (auto& dp_cl : dependent_cells) {
+                    auto dp_cell = msh.cells[dp_cl];
+                    auto fcs_dp = faces(msh, dp_cell);
+                    fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+                }
+                num_faces = fcs.size();
+            }
+            if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
+                // Adding the faces of the dependent terms
+                fcs = faces(msh, cl);
+                auto nb_dp_cl = cl.user_data.dependent_cells_neg.size(); // Number of dependent cells 
+                auto dependent_cells = cl.user_data.dependent_cells_neg;
+                for (auto& dp_cl : dependent_cells) {
+                    auto dp_cell = msh.cells[dp_cl];
+                    auto fcs_dp = faces(msh, dp_cell);
+                    fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+                }
+                num_faces = fcs.size();
+            }
+        }
+        else {
+            // Adding the faces of the dependent terms
+            fcs = faces(msh, cl);
+            auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+            auto dependent_cells = cl.user_data.dependent_cells_neg;
+            if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
+                nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+                dependent_cells = cl.user_data.dependent_cells_pos;
+            }
+            for (auto& dp_cl : dependent_cells) {
+                auto dp_cell = msh.cells[dp_cl];
+                auto fcs_dp = faces(msh, dp_cell);
+                auto ns_dp  = normals(msh, dp_cell);
+                fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+            }
+            num_faces = fcs.size();
+        }
+        size_t f_dofs = num_faces*fbs;
+        
+        // if( double_unknowns )
+        //     f_dofs = 2 * f_dofs;
+
+        Matrix<T, Dynamic, 1> solF = Matrix<T, Dynamic, 1>::Zero( f_dofs );
+
+        for (size_t face_i = 0; face_i < num_faces; face_i++)
+        {
+            auto fc = fcs[face_i];
+
+            if( loc_zone != element_location::ON_INTERFACE )
+            {
+                auto loc_fc = location(msh, fc);
+                if( !(loc_fc == element_location::ON_INTERFACE || loc_fc == loc_zone) )
+                    continue;
+            }
+
+            auto face_LHS_offset = face_SOL_offset(msh, fc);
+            if ( location(msh, fc) == element_location::ON_INTERFACE
+                 && loc_zone == element_location::ON_INTERFACE )
+            {
+                // we assume that there is not boundary condition on cut cells (for interface pb)
+                solF.block(face_i*fbs, 0, fbs, 1) = solution.block(face_LHS_offset, 0, fbs, 1);
+                solF.block( (num_faces+face_i)*fbs, 0, fbs, 1)
+                    = solution.block(face_LHS_offset + fbs, 0, fbs, 1);
+                continue;
+            }
+
+            bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET;
+            if (dirichlet)
+            {
+                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, facdeg);
+                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, facdeg, dir_func);
+                solF.block(face_i*fbs, 0, fbs, 1) = mass.ldlt().solve(rhs);
+                continue;
+            }
+            if( location(msh, cl) == element_location::ON_INTERFACE &&
+                location(msh, fc) == element_location::IN_POSITIVE_SIDE &&
+                loc_zone == element_location::ON_INTERFACE )
+            {
+                solF.block((num_faces+face_i)*fbs, 0, fbs, 1)
+                    = solution.block(face_LHS_offset, 0, fbs, 1);
+                continue;
+            }
+            //else
+            solF.block(face_i*fbs, 0, fbs, 1) = solution.block(face_LHS_offset, 0, fbs, 1);
+        }
+        return solF;
+    }
+
 
     void finalize(void)
     {
@@ -1326,7 +1457,6 @@ public:
         }
         else
         {
-            std::cout << "coucou" << std::endl;
             cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
         }
 
@@ -1370,7 +1500,6 @@ public:
                 else if (where == element_location::IN_POSITIVE_SIDE)
                     cell_SOL_offset = this->cell_table.at(cell_offset)*cbs + cbs;
                 else  throw std::invalid_argument("Invalid location");
-
             }
             if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
                 std::cout << "TKOneg" << std::endl;
@@ -1379,7 +1508,6 @@ public:
                 else if (where == element_location::IN_POSITIVE_SIDE)
                     cell_SOL_offset = this->cell_table.at(cell_offset)*cbs + cbs;
                 else  throw std::invalid_argument("Invalid location");
-
             }
             if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
                 std::cout << "TKOpos" << std::endl;
@@ -1388,11 +1516,9 @@ public:
                 else if (where == element_location::IN_POSITIVE_SIDE)
                     cell_SOL_offset = this->cell_table.at(cell_offset)*cbs + cbs;
                 else  throw std::invalid_argument("Invalid location");
-                
             }
         }
-        else
-        {
+        else {
             cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
             // Adding the faces of the dependent terms
             fcs = faces(msh, cl);
@@ -1414,12 +1540,13 @@ public:
         Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs + num_faces*fbs);
         ret.block(0, 0, cbs, 1) = solution.block(cell_SOL_offset, 0, cbs, 1);
 
-
-        auto solF = this->get_solF(msh, cl, solution);
-        if(where == element_location::IN_NEGATIVE_SIDE)
-            ret.tail(num_faces * fbs) = solF.head(num_faces * fbs);
-        else
-            ret.tail(num_faces * fbs) = solF.tail(num_faces * fbs);
+        // auto solF = this->get_solF_extended(msh, cl, solution);
+        // if(where == element_location::IN_NEGATIVE_SIDE) {
+        //     ret.tail(num_faces * fbs) = solF.head(num_faces * fbs);
+        // }
+        // else {
+        //     ret.tail(num_faces * fbs) = solF.tail(num_faces * fbs);
+        // }
 
         return ret;
     }

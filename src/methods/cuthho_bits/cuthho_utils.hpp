@@ -748,27 +748,29 @@ make_hho_stabilization_interface_TOK(const cuthho_mesh<T, ET>& msh,
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
 
     // Adding the faces of the dependent terms
-    auto fcs = faces(msh, cl);
-    size_t num_faces_neg = 0;
+    auto fcs_neg = faces(msh, cl);
+    size_t num_faces_neg = fcs_neg.size();
     auto nb_dp_cl_neg = cl.user_data.dependent_cells_neg.size();
     auto dependent_cells_neg = cl.user_data.dependent_cells_neg;
     for (auto& dp_cl : dependent_cells_neg) {
         auto dp_cell = msh.cells[dp_cl];
         auto fcs_dp = faces(msh, dp_cell);
-        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+        fcs_neg.insert(fcs_neg.end(), fcs_dp.begin(), fcs_dp.end());
         num_faces_neg++;
     }
-    size_t num_faces_pos = 0;
+    auto fcs_pos = faces(msh, cl);
+    size_t num_faces_pos = fcs_pos.size();
     auto nb_dp_cl_pos = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
     auto dependent_cells_pos = cl.user_data.dependent_cells_pos;
     for (auto& dp_cl : dependent_cells_pos) {
         auto dp_cell = msh.cells[dp_cl];
         auto fcs_dp = faces(msh, dp_cell);
-        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+        fcs_pos.insert(fcs_pos.end(), fcs_dp.begin(), fcs_dp.end());
         num_faces_pos++;
     }
-    const auto num_faces = fcs.size();
+    const auto num_faces = num_faces_pos + num_faces_neg;
 
+    std::cout << "Dimension stabilisation: " << 2*cbs+num_faces*fbs << std::endl;
     Matrix<T, Dynamic, Dynamic> data
         = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs+num_faces*fbs, 2*cbs+num_faces*fbs);
     // Matrix<T, Dynamic, Dynamic> If = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
@@ -779,7 +781,6 @@ make_hho_stabilization_interface_TOK(const cuthho_mesh<T, ET>& msh,
 
     Matrix<T, Dynamic, Dynamic> stab_n = make_hho_cut_stabilization_TOK(msh, cl, di, element_location::IN_NEGATIVE_SIDE, scaled_Q);
     Matrix<T, Dynamic, Dynamic> stab_p = make_hho_cut_stabilization_TOK(msh, cl, di, element_location::IN_POSITIVE_SIDE, scaled_Q);    
-        
     // cells--cells A DEBUG
     // data.block(0, 0, cbs, cbs) += parms.kappa_1 * stab_n.block(0, 0, cbs, cbs);
     // data.block(cbs, cbs, cbs, cbs) += parms.kappa_2 * stab_p.block(0, 0, cbs, cbs);
@@ -1139,6 +1140,7 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
     auto ns = normals(msh, cl);
     auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
     auto dependent_cells = cl.user_data.dependent_cells_neg;
+    auto nb_dp_cl_neg = nb_dp_cl; // Local copy for the positve case 
     if (where == element_location::IN_POSITIVE_SIDE) {
         nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
         dependent_cells = cl.user_data.dependent_cells_pos;
@@ -1203,7 +1205,7 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
     }
     else if ( where == element_location::IN_POSITIVE_SIDE) {
         gr_rhs.block(0, cbs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-        gr_rhs.block(0, 2*cbs + num_faces*fbs, gbs, num_faces*fbs)
+        gr_rhs.block(0, 2*cbs + nb_dp_cl_neg*fbs, gbs, num_faces*fbs)
                      += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
     }
 

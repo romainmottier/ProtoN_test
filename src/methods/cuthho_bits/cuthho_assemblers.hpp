@@ -1551,8 +1551,6 @@ public:
         return ret;
     }
                         
-
-
     Matrix<T, Dynamic, 1>
     gather_cell_dof(const Mesh& msh, const typename Mesh::cell_type& cl,
                     const Matrix<T, Dynamic, 1>& solution,

@@ -28,7 +28,6 @@ create_kg_and_mg_cuthho_interface(const Mesh& msh, hho_degree_info & hdi, meth &
     tc.tic();
     auto assembler = make_one_field_interface_assembler(msh, bcs_fun, hdi);
     std::vector<std::pair<size_t,size_t>> cell_basis_data = assembler.compute_cell_basis_data(msh);
-    size_t cell_ind = 0;
     for (auto& cell : msh.cells) {
       auto contrib = method.make_contrib(msh, cell, test_case, hdi);
       auto lc = contrib.first;
@@ -39,7 +38,6 @@ create_kg_and_mg_cuthho_interface(const Mesh& msh, hho_degree_info & hdi, meth &
       mass.block(0,0,cell_mass.rows(),cell_mass.cols()) = cell_mass;
       assembler.assemble_ex(msh, cell, lc, f);
       assembler.assemble_mass(msh, cell, mass);
-      cell_ind++;
     }
     assembler.finalize();
     tc.toc();
@@ -72,28 +70,14 @@ test_operators(const Mesh& msh, hho_degree_info & hdi, meth &method, testType & 
     auto assembler = make_one_field_interface_assembler(msh, bcs_fun, hdi);
     std::vector<std::pair<size_t,size_t>> cell_basis_data = assembler.compute_cell_basis_data(msh);
 
-    // Verification size of the problem
-    size_t cell_ind = 0;
-    size_t x_dof_global_size = 0;
-    size_t nb_theorique = 700;
-    for (auto& cell : msh.cells) {
-      auto contrib = method.make_contrib(msh, cell, test_case, hdi);
-      x_dof_global_size += std::sqrt(contrib.first.size());
-      if (location(msh, cell) == element_location::ON_INTERFACE) {
-        nb_theorique += 7;
-      }
-      std::cout << "local_dof_size = " << std::sqrt(contrib.first.size()) << std::endl;
-      std::cout << "n_x_dofs = " << x_dof_global_size << std::endl;
-      std::cout << "Theorique number of dofs = " << nb_theorique << std::endl;
-      cell_ind++;
-    }
-    // Verification Gradient reconstruction
-    Matrix<RealType, Dynamic, 1> x_dof_proj = Matrix<RealType, Dynamic, 1>::Zero(x_dof_global_size, 1);
-    for (auto& cell : msh.cells) {
-      assembler.project_over_cells_extended(msh, hdi, x_dof_proj, sol_fun);
-    }
+    auto dofs_proj = assembler.make_projection_operator(msh, hdi, sol_fun);
+    // Matrix<RealType, Dynamic, 1> x_dof_proj = Matrix<RealType, Dynamic, 1>::Zero(x_dof_global_size, 1);
+    // for (auto& cell : msh.cells) {
+    //   auto contrib = method.make_contrib(msh, cell, test_case, hdi);
+    //   assembler.project_over_cells_extended(msh, hdi, x_dof_proj, sol_fun);
+    // }
 
-
+    
     return cell_basis_data;
 }
 

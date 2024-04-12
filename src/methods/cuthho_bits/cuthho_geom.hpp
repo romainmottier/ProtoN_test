@@ -1461,12 +1461,13 @@ diameter(const cuthho_mesh<T, ET>& msh,
 }
 
 template<typename T, size_t ET>
-std::pair<std::vector<typename Mesh::face_type>, std::vector< Matrix<T,2,1> >>  
+// std::pair<std::vector<typename Mesh::face_type>, std::vector< Matrix<T,2,1> >>  
+std::vector<typename Mesh::face_type>  
 faces_extended(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl)
 {
 //std::vector<typename Mesh::face_type> 
     auto fcs = faces(msh, cl);
-    auto ns  = normals(msh, cl);
+    auto ns  = normals(msh, cl); 
     // UNCUT CELLS 
     if (!is_cut(msh, cl)) {
         auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
@@ -1557,5 +1558,6 @@ faces_extended(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>:
         std::cout << std::endl << std::endl;
     }
 
-    return std::make_pair(fcs, ns);
+    return fcs;
+    // return std::make_pair(fcs, ns);
 }

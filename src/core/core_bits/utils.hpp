@@ -206,7 +206,7 @@ make_mass_matrix(const Mesh& msh, const typename Mesh::cell_type& cl,
         Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), di);
         mass_mat.block(cbs+i*fbs, cbs+i*fbs, fbs, fbs) = face_mm;
     }
-
+    std::cout << "COUCOUCOUCOUCOUCCOUCOUCOUCOUCOCUOCU" << std::endl;
     return mass_mat;
 }
 
@@ -335,7 +335,7 @@ project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
                  hho_degree_info hdi, const Function& f, size_t di = 0)
 {
     using T = typename Mesh::coordinate_type;
-
+    
     auto cbs = cell_basis<Mesh,T>::size(hdi.cell_degree());
     auto fbs = face_basis<Mesh,T>::size(hdi.face_degree());
 
@@ -361,42 +361,29 @@ project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 template<typename Mesh, typename Function>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-project_function_extended(const Mesh& msh, const typename Mesh::cell_type& cl,
+project_function_uncut(const Mesh& msh, const typename Mesh::cell_type& cl,
                  hho_degree_info hdi, const Function& f, size_t di = 0)
 {
     using T = typename Mesh::coordinate_type;
-
+    
     auto cbs = cell_basis<Mesh,T>::size(hdi.cell_degree());
     auto fbs = face_basis<Mesh,T>::size(hdi.face_degree());
 
-    // Adding the faces of the dependent terms
-    auto fcs = faces(msh, cl);
-    auto fcs_neg = faces(msh, cl);
-    auto fcs_pos = faces(msh, cl);
-    auto nb_dp_cl_neg = cl.user_data.dependent_cells_neg.size();
-    auto dependent_cells_neg = cl.user_data.dependent_cells_neg;
-    auto nb_dp_cl_pos = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
-    auto dependent_cells_pos = cl.user_data.dependent_cells_pos;
-    for (auto& dp_cl : dependent_cells_neg) {
-        auto dp_cell = msh.cells[dp_cl];
-        auto fcs_dp = faces(msh, dp_cell);
-        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
-    }
-    if (fcs_neg.size() >= fcs_pos.size()) {
-        fcs = fcs_neg;
-    }
-    else {
-        fcs = fcs_pos;
-    }
-    const auto num_faces = fcs.size();
+    auto offset_cl = offset(msh, cl);
+    std::cout << "Projection on uncut cell: " << offset_cl << std::endl;
+    
+    auto fcs = faces_extended_uncut(msh, cl).first;
+    auto num_faces = fcs.size();
     
     Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
 
     Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), di);
+    // std::cout << "MASS MATRIX SIZE = " << cell_mm.size() << std::endl;
     Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, hdi.cell_degree(), f, di);
     ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
 
-    for (size_t i = 0; i < num_faces; i++) {
+    for (size_t i = 0; i < num_faces; i++)
+    {
         auto fc = fcs[i];
         Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), di);
         Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, hdi.face_degree(), f, di);
@@ -405,6 +392,7 @@ project_function_extended(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     return ret;
 }
+
 
 template<typename T>
 T condition_number(const Matrix<T, Dynamic, Dynamic>& A)
@@ -730,4 +718,5 @@ make_vector_mass_matrix(const Mesh& msh, const typename Mesh::face_type& fc, siz
 
     return vector_assembly(scalar_matrix);
 }
+
 

@@ -20,10 +20,6 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-
-
-
-
 ////////////////////////  STATIC CONDENSATION  //////////////////////////
 template<typename T>
 std::pair<   Matrix<T, Dynamic, Dynamic>, Matrix<T, Dynamic, 1>  >
@@ -993,9 +989,6 @@ public:
 
 
 //////////////////////////////   FICTITIOUS DOMAIN ASSEMBLERS   /////////////////////////////
-
-
-
 template<typename Mesh, typename Function>
 class virt_fict_assembler : public virt_scalar_assembler<Mesh, Function>
 {
@@ -1052,7 +1045,6 @@ public:
 };
 
 /////////////////////////////////////////
-
 template<typename Mesh, typename Function>
 class fict_assembler : public virt_fict_assembler<Mesh, Function>
 {
@@ -1113,7 +1105,6 @@ auto make_fict_assembler(const Mesh& msh, const Function dirichlet_bf,
 }
 
 /////////////////////////////////////////
-
 template<typename Mesh, typename Function>
 class fict_condensed_assembler : public virt_fict_assembler<Mesh, Function>
 {
@@ -1187,7 +1178,6 @@ public:
     }
 };
 
-
 template<typename Mesh, typename Function>
 auto make_fict_condensed_assembler(const Mesh& msh, const Function dirichlet_bf,
                                     hho_degree_info hdi, element_location where)
@@ -1197,8 +1187,6 @@ auto make_fict_condensed_assembler(const Mesh& msh, const Function dirichlet_bf,
 
 
 ////////////////////////////////  INTERFACE ASSEMBLERS  /////////////////////////
-
-
 
 template<typename Mesh, typename Function>
 class virt_interface_assembler : public virt_scalar_assembler<Mesh, Function>
@@ -1640,70 +1628,171 @@ public:
         return cell_basis_data;
     }
 
-    Matrix<T, Dynamic, 1> make_projection_operator(const Mesh& msh, hho_degree_info hho_di, std::function<T(const typename Mesh::point_type& )> scal_fun){
-        
-        // System size
-        T n_dofs;
-        for (auto& cl : msh.cells) {
-            auto celdeg = this->di.cell_degree();
-            auto facdeg = this->di.face_degree();
+    auto compute_dofs_data(Mesh& msh, hho_degree_info hdi){
+
+        size_t nb_cells =  msh.cells.size();
+
+        // Filling the structure cell offset 
+        auto offset = 0;
+        for(size_t i=0; i < nb_cells; i++) {
+            auto& cl = msh.cells[i];
+            auto celdeg = hdi.cell_degree();
+            auto facdeg = hdi.face_degree();
             auto cbs   = cell_basis<Mesh,T>::size(celdeg);
             auto fbs   = face_basis<Mesh,T>::size(facdeg);
-            auto fces  = faces(msh, cl);
-            auto facessss = faces_extended(msh, cl).first;
-            if( location(msh, cl) != element_location::ON_INTERFACE ){
-                n_dofs += cbs + fces.size()*fbs;
-            }
-            else {
-                n_dofs += 2*(cbs + fces.size()*fbs);
-            }
-        }
-        // std::cout << n_dofs;
-    
-        Matrix<T, Dynamic, 1> x_glob = Matrix<T, Dynamic, 1>::Zero(n_dofs, 1);
-        // Loop on uncut, cut cells, and good side of ill-cut cells 
-        for (auto& cl : msh.cells) {
-            if(location(msh, cl) != element_location::ON_INTERFACE){
-                project_over_uncutcells(msh, cl, hho_di, x_glob, scal_fun);
+            if (!is_cut(msh, cl)) {
+                cl.user_data.cell_offset_ddl = offset;
+                // std::cout << "Offset: " << offset << std::endl;        
+                auto fcs = faces_extended_uncut(msh, cl).first;
+                offset += cbs + fcs.size()*fbs;
             }
             else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
-                project_over_cutcells(msh, cl, hho_di, x_glob, scal_fun);
+                cl.user_data.cell_offset_ddl = offset;   
+                // std::cout << "Offset: " << offset << std::endl;  
+                auto fcs = faces(msh, cl);
+                auto fcs_neg = faces_extended_TOK(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
+                auto fcs_pos = faces_extended_TOK(msh, cl, element_location::IN_POSITIVE_SIDE).first;
+                offset += 2*cbs + (fcs.size() + fcs_neg.size() + fcs_pos.size())*fbs;
+            }
+            else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
+                cl.user_data.cell_offset_ddl = offset;        
+                // std::cout << "Offset: " << offset << std::endl;  
+                auto fcs = faces_extended_TKOibar(msh, cl, element_location::IN_POSITIVE_SIDE).first;
+                offset += 2*cbs + fcs.size()*fbs;
+            }        
+            else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
+                cl.user_data.cell_offset_ddl = offset;      
+                // std::cout << "Offset: " << offset << std::endl;      
+                auto fcs = faces_extended_TKOibar(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
+                offset += 2*cbs + fcs.size()*fbs;
+            }
+            // std::cout << "cl.user_data.cell_offset_ddl " << cl.user_data.cell_offset_ddl << std::endl;
+        }
+        // Vérif n_dofs
+        // auto n_dofs = 0;
+        // for(size_t i=0; i < nb_cells; i++) {
+        //     auto cl = msh.cells[i];
+        //     auto celdeg = hdi.cell_degree();
+        //     auto facdeg = hdi.face_degree();
+        //     auto cbs   = cell_basis<Mesh,T>::size(celdeg);
+        //     auto fbs   = face_basis<Mesh,T>::size(facdeg);
+        //     auto local_dofs = 0;
+        //     if (!is_cut(msh, cl)) {
+        //         local_dofs = 7;
+        //     }
+        //     else {
+        //         local_dofs = 14;
+        //     }
+        //     n_dofs += local_dofs;
+        // }
+        // std::cout << "n_dofs = " << n_dofs << std::endl;
+
+        
+        // std::vector<std::pair<size_t,size_t>> cell_basis_data;
+        // cell_basis_data.reserve(nb_cells);
+        // size_t cell_ind = 0;
+        // for(auto& cl : msh.cells) {
+        //     bool double_unknowns = ( location(msh, cl) == element_location::ON_INTERFACE);
+        //     auto cbs = this->loc_cbs;
+        //     if( double_unknowns ){
+        //         cbs *= 2;
+        //     }
+        //     cell_basis_data.push_back(std::make_pair(cell_ind, cbs));
+        //     cell_ind++;
+        // }
+        // std::cout << "Offset: " << offset << std::endl;
+        // std::cout << "COMPUTE_DOFS_DATA OK" << std::endl;
+
+        return offset;
+    }
+
+
+    Matrix<T, Dynamic, 1> make_projection_operator(const Mesh& msh, hho_degree_info hho_di, size_t system_size, std::function<T(const typename Mesh::point_type& )> scal_fun){
+        
+        Matrix<T, Dynamic, 1> x_glob = Matrix<T, Dynamic, 1>::Zero(system_size, 1);
+ 
+        // Loop on uncut, cut cells, and good side of ill-cut cells 
+        for (const auto& cl : msh.cells) {
+            auto celdeg = this->di.cell_degree();
+            auto facdeg = this->di.face_degree();
+            auto cbs = cell_basis<Mesh,T>::size(celdeg);
+            auto fbs = face_basis<Mesh,T>::size(facdeg);
+            if (location(msh, cl) != element_location::ON_INTERFACE){    
+                std::cout << "Cell: " << offset(msh,cl) << std::endl;        
+                auto fcs = faces_extended_uncut(msh, cl).first;
+                auto num_faces = fcs.size();
+                Matrix<T, Dynamic, 1> x_proj_dof = project_function_uncut(msh, cl, hho_di, scal_fun);
+                x_glob.block(cl.user_data.cell_offset_ddl, 0, cbs + num_faces*fbs, 1) = x_proj_dof.block(0, 0, cbs + num_faces*fbs, 1);
+                std::cout << x_glob.block(cl.user_data.cell_offset_ddl, 0, cbs + num_faces*fbs, 1) << std::endl;
+            }
+            else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
+                std::cout << "Cell: " << offset(msh,cl) << std::endl;        
+                auto fcs_neg = faces_extended_TOK(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
+                auto fcs_pos = faces_extended_TOK(msh, cl, element_location::IN_POSITIVE_SIDE).first;
+                auto num_faces_neg = fcs_neg.size();
+                auto num_faces_pos = fcs_pos.size();
+                Matrix<T, Dynamic, 1> x_neg_proj_dof = project_function_TOK(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
+                Matrix<T, Dynamic, 1> x_pos_proj_dof = project_function_TOK(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
+                x_glob.block(cl.user_data.cell_offset_ddl, 0, cbs, 1) = x_neg_proj_dof.block(0, 0, cbs, 1);     // cbs in negative side 
+                x_glob.block(cl.user_data.cell_offset_ddl+cbs, 0, cbs, 1) = x_pos_proj_dof.block(0, 0, cbs, 1); // cbs in positive side
+                x_glob.block(cl.user_data.cell_offset_ddl+2*cbs, 0, fbs*num_faces_neg, 1) = x_neg_proj_dof.block(cbs, 0, fbs*num_faces_neg, 1);                      // fbs in negative side 
+                x_glob.block(cl.user_data.cell_offset_ddl+2*cbs + fbs*num_faces_neg, 0, fbs*num_faces_pos, 1) = x_pos_proj_dof.block(cbs, 0, fbs*num_faces_pos, 1); // fbs in positive side 
+                std::cout << x_glob.block(cl.user_data.cell_offset_ddl, 0, 2*cbs + (num_faces_neg+num_faces_pos)*fbs, 1) << std::endl;
             }
             else {
                 if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
-                    Matrix<T, Dynamic, 1> x_pos_proj_dof = project_function(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
-                    auto celdeg = this->di.cell_degree();
-                    auto facdeg = this->di.face_degree();
-                    auto cbs = cell_basis<Mesh,T>::size(celdeg);
-                    auto fbs = face_basis<Mesh,T>::size(facdeg);
-                    auto cell_offset        = offset(msh, cl);
-                    size_t cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
-                    x_glob.block(cell_SOL_offset+cbs, 0, cbs, 1) = x_pos_proj_dof.block(0, 0, cbs, 1);
+                    std::cout << "Cell: " << offset(msh,cl) << std::endl;                    
+                    auto fcs_pos = faces_extended_TKOibar(msh, cl, element_location::IN_POSITIVE_SIDE).first;
+                    auto num_faces_pos = fcs_pos.size();   
+                    Matrix<T, Dynamic, 1> x_neg_proj_dof = project_function_TKOi(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
+                    Matrix<T, Dynamic, 1> x_pos_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
+                    x_glob.block(cl.user_data.cell_offset_ddl, 0, cbs, 1) = x_neg_proj_dof;                         // cbs in negative side 
+                    x_glob.block(cl.user_data.cell_offset_ddl+cbs, 0, cbs, 1) = x_pos_proj_dof.block(0, 0, cbs, 1); // cbs in positive side
+                    x_glob.block(cl.user_data.cell_offset_ddl+2*cbs, 0, fbs*num_faces_pos, 1) = x_pos_proj_dof.block(cbs, 0, fbs*num_faces_pos, 1); // fbs in positive side 
+                    std::cout << x_glob.block(cl.user_data.cell_offset_ddl, 0, 2*cbs + num_faces_pos*fbs, 1) << std::endl;
                 }
                 if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-                    Matrix<T, Dynamic, 1> x_neg_proj_dof = project_function(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
-                    auto celdeg = this->di.cell_degree();
-                    auto facdeg = this->di.face_degree();
-                    auto cbs = cell_basis<Mesh,T>::size(celdeg);
-                    auto fbs = face_basis<Mesh,T>::size(facdeg);
-                    auto cell_offset        = offset(msh, cl);
-                    size_t cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
-                    x_glob.block(cell_SOL_offset, 0, cbs, 1) = x_neg_proj_dof.block(0, 0, cbs, 1);
+                    std::cout << "Cell: " << offset(msh,cl) << std::endl;                    
+                    auto fcs_neg = faces_extended_TKOibar(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
+                    auto num_faces_neg = fcs_neg.size();   
+                    Matrix<T, Dynamic, 1> x_neg_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
+                    Matrix<T, Dynamic, 1> x_pos_proj_dof = project_function_TKOi(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
+                    x_glob.block(cl.user_data.cell_offset_ddl, 0, cbs, 1) = x_neg_proj_dof.block(0, 0, cbs, 1);                         // cbs in negative side 
+                    x_glob.block(cl.user_data.cell_offset_ddl+cbs, 0, cbs, 1) = x_pos_proj_dof; // cbs in positive side
+                    x_glob.block(cl.user_data.cell_offset_ddl+2*cbs, 0, fbs*num_faces_neg, 1) = x_neg_proj_dof.block(cbs, 0, fbs*num_faces_neg, 1); // fbs in positive side 
+                    std::cout << x_glob.block(cl.user_data.cell_offset_ddl, 0, 2*cbs + num_faces_neg*fbs, 1) << std::endl;
                 }
             }
         }
         // Loop on ill side of ill-cut cells 
         for (auto& cl : msh.cells) {
             if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
-                    
+        //         Matrix<T, Dynamic, 1> x_neg_proj_dof = project_function_bad_side_extension(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
+        //         auto celdeg = this->di.cell_degree();
+        //         auto facdeg = this->di.face_degree();
+        //         auto cbs = cell_basis<Mesh,T>::size(celdeg);
+        //         auto fbs = face_basis<Mesh,T>::size(facdeg);
+        //         auto cell_offset       = offset(msh, cl);
+        //         size_t cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
+        //         x_glob.block(cell_SOL_offset, 0, cbs, 1) = x_neg_proj_dof.block(0, 0, cbs, 1);                   
             }
             if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-                    
+        //             Matrix<T, Dynamic, 1> x_pos_proj_dof = project_function_bad_side_extension(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
+        //             auto celdeg = this->di.cell_degree();
+        //             auto facdeg = this->di.face_degree();
+        //             auto cbs = cell_basis<Mesh,T>::size(celdeg);
+        //             auto fbs = face_basis<Mesh,T>::size(facdeg);
+        //             auto cell_offset        = offset(msh, cl);
+        //             size_t cell_SOL_offset = this->cell_table.at(cell_offset) * cbs;
+        //             x_glob.block(cell_SOL_offset+cbs, 0, cbs, 1) = x_pos_proj_dof.block(0, 0, cbs, 1);       
             }
             
         }
 
         // std::cout << x_glob << std::endl;
+        // std::cout << std::endl << x_glob.size() << std::endl;
+        // std::cout << "MAKE_PROJECTION_OPERATOR" << std::endl;
+
         return x_glob;
     }
 

@@ -743,7 +743,6 @@ make_hho_stabilization_interface_TOK(const cuthho_mesh<T, ET>& msh,
 
     auto celdeg = di.cell_degree();
     auto facdeg = di.face_degree();
-
     auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
 
@@ -1898,10 +1897,9 @@ project_function(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET
     return ret;
 }
 
-
 template<typename T, size_t ET, typename Function>
 Matrix<T, Dynamic, 1>
-project_function_extended(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl,
+project_function_bad_side_extension(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl,
                  hho_degree_info hdi, element_location where, const Function& f)
 {
     auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(hdi.cell_degree());
@@ -1940,6 +1938,192 @@ project_function_extended(const cuthho_mesh<T, ET>& msh, const typename cuthho_m
 
     return ret;
 }
+
+template<typename T, size_t ET, typename Function>
+Matrix<T, Dynamic, 1>
+project_function_extended(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl,
+                 hho_degree_info hdi, element_location where, const Function& f)
+{
+    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(hdi.cell_degree());
+    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(hdi.face_degree());
+
+    auto offset_cl = offset(msh, cl);
+    std::cout << "Projection on cut cell: " << offset_cl << std::endl;
+
+    auto fcs = faces_extended(msh, cl).first;
+    auto num_faces = fcs.size();
+
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
+
+    if ( location(msh, cl) != element_location::ON_INTERFACE &&
+         location(msh, cl) != where )
+        return ret;
+
+    // Projection on cell
+    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), where);
+    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, hdi.cell_degree(), f, where);
+    ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
+
+    // Projection faces
+    for (size_t i = 0; i < num_faces; i++)
+    {
+        auto fc = fcs[i];
+
+        if ( location(msh, fc) != element_location::ON_INTERFACE &&
+             location(msh, fc) != where )
+        {
+            ret.block(cbs+i*fbs, 0, fbs, 1) = Matrix<T, Dynamic, 1>::Zero(fbs);
+        }
+        else
+        {
+            Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), where);
+            Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, hdi.face_degree(), where, f);
+            ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
+        }
+    }
+
+    return ret;
+}
+
+
+
+template<typename T, size_t ET, typename Function>
+Matrix<T, Dynamic, 1>
+project_function_TOK(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl,
+                 hho_degree_info hdi, element_location where, const Function& f)
+{
+    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(hdi.cell_degree());
+    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(hdi.face_degree());
+
+    auto offset_cl = offset(msh, cl);
+    std::cout << "Projection on TOK cell: " << offset_cl << std::endl;
+
+    std::vector<typename cuthho_mesh<T, ET>::face_type> fcs;
+    if (where == element_location::IN_NEGATIVE_SIDE) {
+        fcs = faces_extended_TOK(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
+    }
+    else {
+        fcs = faces_extended_TOK(msh, cl, element_location::IN_POSITIVE_SIDE).first;
+    }
+    auto num_faces = fcs.size();
+
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
+
+    if ( location(msh, cl) != element_location::ON_INTERFACE &&
+         location(msh, cl) != where )
+        return ret;
+
+    // Projection on cell
+    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), where);
+    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, hdi.cell_degree(), f, where);
+    ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
+
+    // Projection faces
+    for (size_t i = 0; i < num_faces; i++)
+    {
+        auto fc = fcs[i];
+
+        if ( location(msh, fc) != element_location::ON_INTERFACE &&
+             location(msh, fc) != where )
+        {
+            ret.block(cbs+i*fbs, 0, fbs, 1) = Matrix<T, Dynamic, 1>::Zero(fbs);
+        }
+        else
+        {
+            Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), where);
+            Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, hdi.face_degree(), where, f);
+            ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
+        }
+    }
+
+    return ret;
+}
+
+template<typename T, size_t ET, typename Function>
+Matrix<T, Dynamic, 1>
+project_function_TKOi(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl,
+                 hho_degree_info hdi, element_location where, const Function& f)
+{
+    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(hdi.cell_degree());
+    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(hdi.face_degree());
+
+    if (where == element_location::IN_NEGATIVE_SIDE) { 
+        auto offset_cl = offset(msh, cl);
+        std::cout << "Projection on TKO NEG cell: " << offset_cl << std::endl;
+    }
+    else { 
+        auto offset_cl = offset(msh, cl);
+        std::cout << "Projection on TKO POS cell: " << offset_cl << std::endl;
+    }
+
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs);
+
+    if ( location(msh, cl) != element_location::ON_INTERFACE &&
+         location(msh, cl) != where )
+        return ret;
+
+    // Projection on cell
+    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), where);
+    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, hdi.cell_degree(), f, where);
+    ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
+
+    return ret;
+}
+
+
+template<typename T, size_t ET, typename Function>
+Matrix<T, Dynamic, 1>
+project_function_TKOibar(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl,
+                 hho_degree_info hdi, element_location where, const Function& f)
+{
+    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(hdi.cell_degree());
+    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(hdi.face_degree());
+
+    std::vector<typename cuthho_mesh<T, ET>::face_type> fcs;
+    if (where == element_location::IN_NEGATIVE_SIDE) {
+        auto offset_cl = offset(msh, cl);
+        std::cout << "Projection on TKO POS cell: " << offset_cl << std::endl;
+        fcs = faces_extended_TKOibar(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
+    }
+    else {
+        auto offset_cl = offset(msh, cl);
+        std::cout << "Projection on TKO NEG cell: " << offset_cl << std::endl;
+        fcs = faces_extended_TKOibar(msh, cl, element_location::IN_POSITIVE_SIDE).first;
+    }
+    auto num_faces = fcs.size();
+
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
+
+    if ( location(msh, cl) != element_location::ON_INTERFACE &&
+         location(msh, cl) != where )
+        return ret;
+
+    // Projection on cell
+    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), where);
+    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, hdi.cell_degree(), f, where);
+    ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
+
+    // Projection faces
+    for (size_t i = 0; i < num_faces; i++)
+    {
+        auto fc = fcs[i];
+        if ( location(msh, fc) != element_location::ON_INTERFACE &&
+             location(msh, fc) != where )
+        {
+            ret.block(cbs+i*fbs, 0, fbs, 1) = Matrix<T, Dynamic, 1>::Zero(fbs);
+        }
+        else
+        {
+            Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), where);
+            Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, hdi.face_degree(), where, f);
+            ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
+        }
+    }
+
+    return ret;
+}
+
+
 
 
 

@@ -359,41 +359,6 @@ project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
     return ret;
 }
 
-template<typename Mesh, typename Function>
-Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-project_function_uncut(const Mesh& msh, const typename Mesh::cell_type& cl,
-                 hho_degree_info hdi, const Function& f, size_t di = 0)
-{
-    using T = typename Mesh::coordinate_type;
-    
-    auto cbs = cell_basis<Mesh,T>::size(hdi.cell_degree());
-    auto fbs = face_basis<Mesh,T>::size(hdi.face_degree());
-
-    auto offset_cl = offset(msh, cl);
-    std::cout << "Projection on uncut cell: " << offset_cl << std::endl;
-    
-    auto fcs = faces_extended_uncut(msh, cl).first;
-    auto num_faces = fcs.size();
-    
-    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
-
-    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), di);
-    // std::cout << "MASS MATRIX SIZE = " << cell_mm.size() << std::endl;
-    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, hdi.cell_degree(), f, di);
-    ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
-
-    for (size_t i = 0; i < num_faces; i++)
-    {
-        auto fc = fcs[i];
-        Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), di);
-        Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, hdi.face_degree(), f, di);
-        ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
-    }
-
-    return ret;
-}
-
-
 template<typename T>
 T condition_number(const Matrix<T, Dynamic, Dynamic>& A)
 {
@@ -401,10 +366,6 @@ T condition_number(const Matrix<T, Dynamic, Dynamic>& A)
     T cond = svd.singularValues()(0) / svd.singularValues()(svd.singularValues().size()-1);
     return cond;
 }
-
-
-
-
 
 class timecounter
 {

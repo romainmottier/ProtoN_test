@@ -1576,8 +1576,6 @@ faces_extended_uncut(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T
     std::vector<typename cuthho_mesh<T, ET>::face_type> fcs = faces(msh, cl);
     auto ns  = normals(msh, cl); 
     
-    // UNCUT CELLS 
-    if (!is_cut(msh, cl)) {
         auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
         auto dependent_cells = cl.user_data.dependent_cells_neg;
         if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
@@ -1602,7 +1600,7 @@ faces_extended_uncut(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T
         }
         // std::cout << std::endl << std::endl;
         const auto num_faces = fcs.size();
-    }
+
     return  std::make_pair(fcs, ns);
 }
 
@@ -1640,8 +1638,7 @@ faces_extended_TOK(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, 
         fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
         ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
     }
-    std::cout << std::endl << std::endl;
-    const auto num_faces = fcs.size();
+    // std::cout << std::endl << std::endl;
     
     return  std::make_pair(fcs, ns);
 }

@@ -1576,51 +1576,51 @@ make_polynomial_extension(Mesh& msh, const Function& level_set_function) {
         }
     }
 
-    // FILLING THE STRUCTURE paired_cells
+    // FILLING THE STRUCTURE paired_cells / dependent_cells_neg / dependent_cells_pos
     for (auto &cl : msh.cells) {
         auto offset_cl = offset(msh,cl);
-        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG || cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
             // std::cout << "Cell: " << offset_cl << std::endl;
             if (table_neg.at(offset_cl) != -1) {
-                cl.user_data.paired_cells.insert(table_neg.at(offset_cl));
+                cl.user_data.paired_cells = table_neg.at(offset_cl);
             }
             if (table_pos.at(offset_cl) != -1) {
-                cl.user_data.paired_cells.insert(table_pos.at(offset_cl));
+                cl.user_data.paired_cells = table_pos.at(offset_cl);
             }    
-            // std::cout << "Paired cell: ";
-            // for (auto& pd_cells : cl.user_data.paired_cells) {
-            //     std::cout << pd_cells;
-            // }
-            // std::cout << std::endl;
+            // std::cout << "Paired cell: " << cl.user_data.paired_cells;
+            // std::cout << std::endl << std::endl;
+            auto& good_cl = msh.cells[cl.user_data.paired_cells];
+            good_cl.user_data.dependent_cells_neg.insert(offset_cl);
+        }
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
+            // std::cout << "Cell: " << offset_cl << std::endl;
+            if (table_neg.at(offset_cl) != -1) {
+                cl.user_data.paired_cells = table_neg.at(offset_cl);
+            }
+            if (table_pos.at(offset_cl) != -1) {
+                cl.user_data.paired_cells = table_pos.at(offset_cl);
+            }    
+            // std::cout << "Paired cell: " << cl.user_data.paired_cells;
+            // std::cout << std::endl << std::endl;
+            auto& good_cl = msh.cells[cl.user_data.paired_cells];
+            good_cl.user_data.dependent_cells_pos.insert(offset_cl);
         }
     }
-    // FILLING THE STRUCTURE dependent_cells 
+    // Verification
     for (auto &cl : msh.cells) {
         auto offset_cl = offset(msh,cl);
         // std::cout << "Cell: " << offset_cl << std::endl;
-        for(size_t i = 0; i < table_pos.size(); i++) {
-            if(table_pos.at(i) == offset_cl) {
-                size_t TN = table_neg.at(offset_cl);
-                cl.user_data.dependent_cells_pos.insert(TN);
-            }
-        }
-        for(size_t i = 0; i < table_neg.size(); i++) {
-            if(table_neg.at(i) == offset_cl) {
-                size_t TP = table_pos.at(offset_cl);
-                cl.user_data.dependent_cells_neg.insert(i);
-            }
-        }
         // std::cout << "Negative dependent cells:   ";
-        // for (auto& cells : cl.user_data.dependent_cells_neg) {
-        //     std::cout << cells << "   ";
-        // }
+        for (auto& cells : cl.user_data.dependent_cells_neg) {
+            // std::cout << cells << "   ";
+        }
         // std::cout << std::endl << "Positive dependent cells:   ";
-        // for (auto& cells : cl.user_data.dependent_cells_pos) {
-        //     std::cout << cells << "   ";
-        // }
-        // std::cout << std::endl;
-        // std::cout << std::endl;
+        for (auto& cells : cl.user_data.dependent_cells_pos) {
+            // std::cout << cells << "   ";
+        }
+        // std::cout << std::endl << std::endl;
     }
+    // Display of the arrows
     std::vector<int> table;
     table.resize(nb_cells);
     for(size_t i=0; i < nb_cells; i++) {

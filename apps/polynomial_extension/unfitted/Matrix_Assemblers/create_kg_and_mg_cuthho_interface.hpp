@@ -71,11 +71,11 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
     std::vector<std::pair<size_t,size_t>> cell_basis_data = assembler.compute_cell_basis_data(msh);
     size_t system_size = assembler.compute_dofs_data(msh, hdi);
     auto dofs_proj = assembler.make_projection_operator(msh, hdi, system_size, sol_fun);
-    // Matrix<RealType, Dynamic, 1> x_dof_proj = Matrix<RealType, Dynamic, 1>::Zero(x_dof_global_size, 1);
-    // for (auto& cell : msh.cells) {
-    //   auto contrib = method.make_contrib(msh, cell, test_case, hdi);
-    //   assembler.project_over_cells_extended(msh, hdi, x_dof_proj, sol_fun);
-    // }
+    for (auto& cell : msh.cells) {
+      auto contrib = method.make_contrib(msh, cell, test_case, hdi);
+      auto lc = contrib.first;
+      auto f = contrib.second;
+    }
 
     
     return cell_basis_data;

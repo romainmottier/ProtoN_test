@@ -1040,17 +1040,34 @@ output_agglo_lists_step4(Mesh& msh, std::vector<int> table_neg, std::vector<int>
           auto bar_cl = barycenter(msh,cl);
           auto bar_neigh = barycenter(msh,msh.cells.at(TN));
           auto vect = bar_neigh - bar_cl;
+          // VERS LE HAUT
           if (vect[0] <= 1e-5 && vect[1] > 0) {
             bar_cl[0] = bar_cl[0] - h/6.0;
           }
+          // VERS LE BAS
           if (vect[0] <= 1e-5 && vect[1] < 0) {
-            bar_cl[0] = bar_cl[0] + h/6.0;
+            // EN HAUT A GAUCHE
+            if (bar_cl[0] <= 0.5 && bar_cl[1] >= 0.5) 
+                bar_cl[0] = bar_cl[0] + h/6.0;
+            else 
+                bar_cl[0] = bar_cl[0] - h/6.0;
           }
+          // VERS LA DROITE
           else if (vect[1] <= 1e-5 && vect[0] > 0){
-            bar_cl[1] = bar_cl[1] + h/6.0;
+            // EN BAS A GAUCHE
+            if (bar_cl[0] <= 0.5 && bar_cl[1] <= 0.5) 
+                bar_cl[1] = bar_cl[1] + h/6.0;
+            // ELSE
+            else 
+                bar_cl[1] = bar_cl[1] - h/6.0;
           }
+          // VERS LA GAUCHE 
           else if (vect[1] <= 1e-5 && vect[0] < 0){
-            bar_cl[1] = bar_cl[1] - h/6.0;
+            // EN HAUT A GAUCHE
+            if (bar_cl[0] >= 0.5 && bar_cl[1] <= 0.5) 
+                bar_cl[1] = bar_cl[1] + h/6.0;
+            else
+                bar_cl[1] = bar_cl[1] + h/6.0;
           }
           output << bar_cl[0] << "   " << bar_cl[1] << "   0.   "
                  << vect[0] << "   " << vect[1] << std::endl;

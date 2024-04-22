@@ -231,13 +231,10 @@ make_hho_naive_stabilization_extended(const Mesh& msh, const typename Mesh::cell
 
     auto celdeg = di.cell_degree();
     auto facdeg = di.face_degree();
-
     auto cbs = cell_basis<Mesh,T>::size(celdeg);
     auto fbs = face_basis<Mesh,T>::size(facdeg);
 
     auto fcs = faces(msh, cl);
-
-
     size_t msize = cbs+faces_extended_uncut(msh,cl).first.size()*fbs;
     Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(msize, msize);
     Matrix<T, Dynamic, Dynamic> If = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);

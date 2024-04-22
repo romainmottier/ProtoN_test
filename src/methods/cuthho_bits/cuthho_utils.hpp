@@ -746,38 +746,37 @@ make_hho_stabilization_interface_TOK(const cuthho_mesh<T, ET>& msh,
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
 
     // Adding the faces of the dependent terms
-    auto fcs_neg = faces_extended_TOK(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
-    auto fcs_pos = faces_extended_TOK(msh, cl, element_location::IN_POSITIVE_SIDE).first;
-    auto num_faces = fcs_neg.size() + fcs_pos.size();
+    auto num_faces = faces(msh, cl);
+    auto num_faces_neg = faces_extended_TOK(msh, cl, element_location::IN_NEGATIVE_SIDE).first.size();
+    auto num_faces_pos = faces_extended_TOK(msh, cl, element_location::IN_POSITIVE_SIDE).first.size();
+    auto num_faces_extended = num_faces_neg + num_faces_pos;
 
-    // std::cout << "Dimension stabilisation: " << 2*cbs+num_faces*fbs << std::endl;
-    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs+num_faces*fbs, 2*cbs+num_faces*fbs);
-
+    // std::cout << "Dimension stabilisation: " << 2*cbs + num_faces_extended*fbs << std::endl;
+    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs + num_faces_extended*fbs, 2*cbs + num_faces_extended*fbs);
     cell_basis<cuthho_mesh<T, ET>,T> cb(msh, cl, celdeg);
-
     auto hT = diameter(msh, cl);
 
-    // Matrix<T, Dynamic, Dynamic> stab_n = make_hho_cut_stabilization_TOK(msh, cl, di, element_location::IN_NEGATIVE_SIDE, scaled_Q);
-    // Matrix<T, Dynamic, Dynamic> stab_p = make_hho_cut_stabilization_TOK(msh, cl, di, element_location::IN_POSITIVE_SIDE, scaled_Q);    
-    // cells--cells A DEBUG
-    // data.block(0, 0, cbs, cbs) += parms.kappa_1 * stab_n.block(0, 0, cbs, cbs);
-    // data.block(cbs, cbs, cbs, cbs) += parms.kappa_2 * stab_p.block(0, 0, cbs, cbs);
-    // // cells--faces
-    // data.block(0, 2*cbs, cbs, num_faces*fbs)
-    //     += parms.kappa_1 * stab_n.block(0, cbs, cbs, num_faces*fbs);
-    // data.block(cbs, 2*cbs + num_faces*fbs, cbs, num_faces*fbs)
-    //     += parms.kappa_2 * stab_p.block(0, cbs, cbs, num_faces*fbs);
-    // // faces--cells
-    // data.block(2*cbs, 0, num_faces*fbs, cbs)
-    //     += parms.kappa_1 * stab_n.block(cbs, 0, num_faces*fbs, cbs);
-    // data.block(2*cbs + num_faces*fbs, cbs, num_faces*fbs, cbs)
-    //     += parms.kappa_2 * stab_p.block(cbs, 0, num_faces*fbs, cbs);
-    // // faces--faces
-    // data.block(2*cbs, 2*cbs, num_faces*fbs, num_faces*fbs)
-    //     += parms.kappa_1 * stab_n.block(cbs, cbs, num_faces*fbs, num_faces*fbs);
-    // data.block(2*cbs + num_faces*fbs, 2*cbs + num_faces*fbs, num_faces*fbs, num_faces*fbs)
-    //     += parms.kappa_2 * stab_p.block(cbs, cbs, num_faces*fbs, num_faces*fbs);
+    Matrix<T, Dynamic, Dynamic> stab_n = make_hho_cut_stabilization(msh, cl, di, element_location::IN_NEGATIVE_SIDE, scaled_Q);
+    Matrix<T, Dynamic, Dynamic> stab_p = make_hho_cut_stabilization(msh, cl, di, element_location::IN_POSITIVE_SIDE, scaled_Q);  
 
+    // cells--cells 
+    data.block(0, 0, cbs, cbs)     += parms.kappa_1 * stab_n.block(0, 0, cbs, cbs);
+    data.block(cbs, cbs, cbs, cbs) += parms.kappa_2 * stab_p.block(0, 0, cbs, cbs);
+
+    // // cells--faces
+    data.block(  0,                     2*cbs, cbs, num_faces*fbs) += parms.kappa_1 * stab_n.block(0, cbs, cbs, num_faces*fbs);
+    data.block(cbs, 2*cbs + num_faces_neg*fbs, cbs, num_faces*fbs) += parms.kappa_2 * stab_p.block(0, cbs, cbs, num_faces*fbs);
+
+    // // faces--cells
+    data.block(2*cbs, 0, num_faces*fbs, cbs)                       += parms.kappa_1 * stab_n.block(cbs, 0, num_faces*fbs, cbs);
+    data.block(2*cbs + num_faces_neg*fbs, cbs, num_faces*fbs, cbs) += parms.kappa_2 * stab_p.block(cbs, 0, num_faces*fbs, cbs);
+
+    // faces--faces
+    data.block(2*cbs, 2*cbs, num_faces*fbs, num_faces*fbs)                                         += parms.kappa_1 * stab_n.block(cbs, cbs, num_faces*fbs, num_faces*fbs);
+    data.block(2*cbs + num_faces_neg*fbs, 2*cbs + num_faces_neg*fbs, num_faces*fbs, num_faces*fbs) += parms.kappa_2 * stab_p.block(cbs, cbs, num_faces*fbs, num_faces*fbs);
+
+    // To remove after checking Gradient reconstruction
+    data = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs + num_faces_extended*fbs, 2*cbs + num_faces_extended*fbs);
     return data;
 }
 
@@ -797,16 +796,16 @@ make_hho_stabilization_interface_TKO_NEG(const cuthho_mesh<T, ET>& msh,
 
     auto celdeg = di.cell_degree();
     auto facdeg = di.face_degree();
-
     auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
-    auto num_faces = faces_extended_TKOibar(msh, cl, element_location::IN_POSITIVE_SIDE).first.size();
 
+    auto num_faces = faces_extended_TKOibar(msh, cl, element_location::IN_NEGATIVE_SIDE).first.size();
+    // std::cout << "Dimension stabilization: " << 2*cbs+num_faces*fbs << std::endl;
     Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs+num_faces*fbs, 2*cbs+num_faces*fbs);
     cell_basis<cuthho_mesh<T, ET>,T> cb(msh, cl, celdeg);
     auto hT = diameter(msh, cl);
 
-    // Matrix<T, Dynamic, Dynamic> stab_p = make_hho_cut_stabilization_TKOibar(msh, cl, di, element_location::IN_POSITIVE_SIDE, scaled_Q);    
+    Matrix<T, Dynamic, Dynamic> stab_p = make_hho_cut_stabilization(msh, cl, di, element_location::IN_POSITIVE_SIDE, scaled_Q);    
     
     // std::cout << "   Stabilisation size initialisation: " << data.size() << std::endl;
     // cells--cells
@@ -820,6 +819,8 @@ make_hho_stabilization_interface_TKO_NEG(const cuthho_mesh<T, ET>& msh,
 
     // std::cout << "   Stabilisation size : " << data.size() << std::endl << std::endl;
 
+    // To remove after checking Gradient reconstruction
+    data = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs+num_faces*fbs, 2*cbs+num_faces*fbs);
     return data;
 
 }
@@ -861,6 +862,8 @@ make_hho_stabilization_interface_TKO_POS(const cuthho_mesh<T, ET>& msh,
     // // faces--faces
     // data.block(2*cbs, 2*cbs, num_faces*fbs, num_faces*fbs) += parms.kappa_1 * stab_n.block(cbs, cbs, num_faces*fbs, num_faces*fbs);
 
+    // To remove after checking Gradient reconstruction
+    data = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs+num_faces*fbs, 2*cbs+num_faces*fbs);
     return data;
 }
 

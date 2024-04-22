@@ -16,13 +16,25 @@ protected:
     make_contrib_cut(const Mesh& msh, const typename Mesh::cell_type& cl,
                      const testType &test_case, const hho_degree_info hdi) {
     }
-    
+
     virtual Vect
     make_contrib_rhs_cut(const Mesh& msh, const typename Mesh::cell_type& cl,
                      const testType &test_case, const hho_degree_info hdi) {
     }
 
 public:
+
+    std::pair<Mat, Vect>
+    make_contrib(const Mesh& msh, const typename Mesh::cell_type& cl,
+                 const testType &test_case, const hho_degree_info hdi) {
+
+        if (location(msh, cl) != element_location::ON_INTERFACE)
+            return make_contrib_uncut(msh, cl, hdi, test_case);
+
+        else // on interface
+            return make_contrib_cut(msh, cl, test_case, hdi);
+    }
+
     std::pair<Mat, Vect>
     make_contrib_uncut(const Mesh& msh, const typename Mesh::cell_type& cl,
                        const hho_degree_info hdi, const testType &test_case) {
@@ -35,8 +47,11 @@ public:
         
         auto level_set_function = test_case.level_set_;
         auto gr  = make_hho_gradrec_vector_extended(msh, cl, hdi, level_set_function);
+        // std::cout << "Gradient reconstruction UNCUT OK" << std::endl;
         Mat stab = make_hho_naive_stabilization_extended(msh, cl, hdi);
+        // std::cout << "Stabilization UNCUT OK" << std::endl;
         Mat lc   = kappa * (gr.second + stab);    
+        // std::cout << "STAB + GRADREC OK" << std::endl;
         Mat f    = make_rhs(msh, cl, hdi.cell_degree(), test_case.rhs_fun);
 
         //  std::cout << "r = " << gr.second << std::endl;
@@ -52,17 +67,6 @@ public:
     {
         Mat f = make_rhs(msh, cl, hdi.cell_degree(), test_case.rhs_fun);
         return f;
-    }
-
-    std::pair<Mat, Vect>
-    make_contrib(const Mesh& msh, const typename Mesh::cell_type& cl,
-                 const testType &test_case, const hho_degree_info hdi) {
-
-        if (location(msh, cl) != element_location::ON_INTERFACE)
-            return make_contrib_uncut(msh, cl, hdi, test_case);
-
-        else // on interface
-            return make_contrib_cut(msh, cl, test_case, hdi);
     }
     
     Vect

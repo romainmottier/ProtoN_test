@@ -206,14 +206,14 @@ make_hho_naive_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
             auto c_phi = cb.eval_basis(qp.first);
             auto f_phi = fb.eval_basis(qp.first);
 
-            mass += qp.second * f_phi * f_phi.transpose();
+            mass  += qp.second * f_phi * f_phi.transpose();
             trace += qp.second * f_phi * c_phi.transpose();
         }
 
         oper.block(0, 0, fbs, cbs) = mass.llt().solve(trace);
         
         if (scaled_Q) {
-            data += oper.transpose() * mass * oper * (1./h);
+            data += oper.transpose() * mass * oper * (1.0/h);
         }
         else {
             data += oper.transpose() * mass * oper;
@@ -225,7 +225,8 @@ make_hho_naive_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_naive_stabilization_extended(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di, bool scaled_Q = true) {
+make_hho_naive_stabilization_extended(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di, bool scaled_Q = true)
+{
     using T = typename Mesh::coordinate_type;
 
     auto celdeg = di.cell_degree();
@@ -235,30 +236,9 @@ make_hho_naive_stabilization_extended(const Mesh& msh, const typename Mesh::cell
     auto fbs = face_basis<Mesh,T>::size(facdeg);
 
     auto fcs = faces(msh, cl);
-    // Face extension 
-    auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
-    auto dependent_cells = cl.user_data.dependent_cells_neg;
-    if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
-        nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
-        dependent_cells = cl.user_data.dependent_cells_pos;
-    }
-    auto offset_cl = offset(msh,cl);
-    std::cout << "Stabilisation: " << std::endl;
-    std::cout << "Uncut Cell: " << offset_cl << std::endl;
-    std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
-    std::cout << "Dependent cells:   ";
-    for (auto& dp_cl : dependent_cells) {
-        std::cout << dp_cl << "  ";
-        auto dp_cell = msh.cells[dp_cl];
-        auto fcs_dp = faces(msh, dp_cell);
-        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
-    }
-    std::cout << std::endl;
 
-    size_t msize = cbs+fcs.size()*fbs;
 
-    // std::cout << "Number of faces = " << fcs.size() << std::endl << std::endl;
-
+    size_t msize = cbs+faces_extended_uncut(msh,cl).first.size()*fbs;
     Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(msize, msize);
     Matrix<T, Dynamic, Dynamic> If = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
 
@@ -283,14 +263,14 @@ make_hho_naive_stabilization_extended(const Mesh& msh, const typename Mesh::cell
             auto c_phi = cb.eval_basis(qp.first);
             auto f_phi = fb.eval_basis(qp.first);
 
-            mass += qp.second * f_phi * f_phi.transpose();
+            mass  += qp.second * f_phi * f_phi.transpose();
             trace += qp.second * f_phi * c_phi.transpose();
         }
 
         oper.block(0, 0, fbs, cbs) = mass.llt().solve(trace);
         
         if (scaled_Q) {
-            data += oper.transpose() * mass * oper * (1./h);
+            data += oper.transpose() * mass * oper * (1.0/h);
         }
         else {
             data += oper.transpose() * mass * oper;
@@ -299,6 +279,8 @@ make_hho_naive_stabilization_extended(const Mesh& msh, const typename Mesh::cell
 
     return data;
 }
+
+
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
@@ -470,30 +452,13 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
     auto gbs = vector_cell_basis<Mesh,T>::size(graddeg);
 
     // Adding the faces of the dependent terms
-    auto fcs = faces(msh, cl);
-    auto ns = normals(msh, cl);
-    auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
-    auto dependent_cells = cl.user_data.dependent_cells_neg;
-    if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
-        std::cout << "Positive side" << std::endl;
-        nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
-        dependent_cells = cl.user_data.dependent_cells_pos;
-    }
-    auto offset_cl = offset(msh,cl);
-    std::cout << "Reconstruction: " << std::endl;
-    std::cout << "Uncut Cell: " << offset_cl << std::endl;
-    std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
-    std::cout << "Dependent cells:   ";
-    for (auto& dp_cl : dependent_cells) {
-        std::cout << dp_cl << "  ";
-        auto dp_cell = msh.cells[dp_cl];
-        auto fcs_dp = faces(msh, dp_cell);
-        auto ns_dp  = normals(msh, dp_cell);
-        fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
-        ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
-    }
-    std::cout << std::endl << std::endl;
+    auto fcs = faces_extended_uncut(msh, cl).first;
+    auto ns  = faces_extended_uncut(msh, cl).second;
     const auto num_faces = fcs.size();
+    
+    // auto offset_cl = offset(msh,cl);
+    // std::cout << "UNCUT CELL: " << offset_cl << std::endl;
+    // std::cout << "NUMBER OF FACES: " << num_faces << std::endl;
 
     matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
     matrix_type gr_rhs = matrix_type::Zero(gbs, cbs + num_faces*fbs);
@@ -510,7 +475,7 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
     }
 
     // face term
-    for (size_t i = 0; i < fcs.size(); i++) {
+    for (size_t i=0; i < num_faces; i++) {
         const auto fc = fcs[i];
         const auto n  = ns[i];
         face_basis<Mesh,T> fb(msh, fc, facdeg);
@@ -525,12 +490,16 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
         }
     }
 
-    // Interface term
+    // Interface term of the extended cells
     if (cl.user_data.location == element_location::IN_NEGATIVE_SIDE) {
+        auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+        auto dependent_cells = cl.user_data.dependent_cells_neg;
         for (auto& dp_cl : dependent_cells) {
-            
-        }
+            std::cout << "(UNCUT) AJOUT DU TERME D'INTERFACE POUR LA FACE DEPENDANTE: " << offset(msh, msh.cells[dp_cl]) << std::endl;
+        } 
     }
+
+
 
     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;

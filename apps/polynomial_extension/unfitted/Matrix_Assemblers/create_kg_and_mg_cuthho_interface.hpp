@@ -72,6 +72,12 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
     size_t system_size = assembler.compute_dofs_data(msh, hdi);
     auto dofs_proj = assembler.make_projection_operator(msh, hdi, system_size, sol_fun);
     for (auto& cell : msh.cells) {
+
+      ////////// DEBUG
+      auto offset_cl = offset(msh, cell);
+      std::cout << "Cell: " << offset_cl << std::endl;
+      //////////
+      
       auto contrib = method.make_contrib(msh, cell, test_case, hdi);
       auto lc = contrib.first;
       auto f = contrib.second;

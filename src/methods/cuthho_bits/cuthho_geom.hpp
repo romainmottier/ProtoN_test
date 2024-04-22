@@ -1460,112 +1460,112 @@ diameter(const cuthho_mesh<T, ET>& msh,
     return ret;
 }
 
-template<typename T, size_t ET>
-auto  
-faces_extended(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl)
-{
+// template<typename T, size_t ET>
+// auto  
+// faces_extended(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl)
+// {
 
-    std::vector<typename cuthho_mesh<T, ET>::face_type> fcs = faces(msh, cl);
-    auto ns  = normals(msh, cl); 
+//     std::vector<typename cuthho_mesh<T, ET>::face_type> fcs = faces(msh, cl);
+//     auto ns  = normals(msh, cl); 
     
-    // UNCUT CELLS 
-    if (!is_cut(msh, cl)) {
-    //     auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
-    //     auto dependent_cells = cl.user_data.dependent_cells_neg;
-    //     if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
-    //         std::cout << "Positive side" << std::endl;
-    //         nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
-    //         dependent_cells = cl.user_data.dependent_cells_pos;
-    //     }
-    //     else {
-    //         std::cout << "Negative side" << std::endl;
-    //     }
-    //     auto offset_cl = offset(msh,cl);
-    //     std::cout << "Uncut Cell: " << offset_cl << std::endl;
-    //     std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
-    //     std::cout << "Dependent cells:   ";
-    //     for (auto& dp_cl : dependent_cells) {
-    //         std::cout << dp_cl << "  ";
-    //         auto dp_cell = msh.cells[dp_cl];
-    //         auto fcs_dp = faces(msh, dp_cell);
-    //         auto ns_dp  = normals(msh, dp_cell);
-    //         fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
-    //         ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
-    //     }
-    //     std::cout << std::endl << std::endl;
-    //     const auto num_faces = fcs.size();
-    }
-    // TKO NEG 
-    else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
-        // Adding the faces of the dependent terms
-        auto nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
-        auto dependent_cells = cl.user_data.dependent_cells_pos;
-        auto offset_cl = offset(msh,cl);
-        std::cout << "TKO_NEG: " << offset_cl << std::endl;
-        std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
-        std::cout << "Dependent cells:   ";
-        for (auto& dp_cl : dependent_cells) {
-            std::cout << dp_cl << "  ";
-            auto dp_cell = msh.cells[dp_cl];
-            auto fcs_dp = faces(msh, dp_cell);
-            auto ns_dp  = normals(msh, dp_cell);
-            fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
-            ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
-        }
-        std::cout << std::endl << std::endl;
-        auto num_faces = fcs.size();
-    }
-    // TKO_POS
-    else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-        auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
-        auto dependent_cells = cl.user_data.dependent_cells_neg;
-        auto offset_cl = offset(msh,cl);
-        std::cout << "TKO_POS: " << offset_cl << std::endl;
-        std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
-        std::cout << "Dependent cells:   ";
-        for (auto& dp_cl : dependent_cells) {
-            std::cout << dp_cl << "  ";
-            auto dp_cell = msh.cells[dp_cl];
-            auto fcs_dp = faces(msh, dp_cell);
-            auto ns_dp  = normals(msh, dp_cell);
-            fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
-            ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
-        }
-        std::cout << std::endl << std::endl;
-    }
-    // TOK
-    else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
-        auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
-        auto dependent_cells = cl.user_data.dependent_cells_neg;        
-        auto offset_cl = offset(msh,cl);
-        std::cout << "TOK: " << offset_cl << std::endl;
-        std::cout << "Number NEG of dependant cells: " << nb_dp_cl << std::endl;
-        std::cout << "Dependent cells:   ";
-        for (auto& dp_cl : dependent_cells) {
-            std::cout << dp_cl << "  ";
-            auto dp_cell = msh.cells[dp_cl];
-            auto fcs_dp = faces(msh, dp_cell);
-            auto ns_dp  = normals(msh, dp_cell);
-            fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
-            ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
-        }
-        nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
-        dependent_cells = cl.user_data.dependent_cells_pos;
-        std::cout << "Number POS of dependant cells: " << nb_dp_cl << std::endl;
-        std::cout << "Dependent cells:   ";
-        for (auto& dp_cl : dependent_cells) {
-            std::cout << dp_cl << "  ";
-            auto dp_cell = msh.cells[dp_cl];
-            auto fcs_dp = faces(msh, dp_cell);
-            auto ns_dp  = normals(msh, dp_cell);
-            fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
-            ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
-        }
-        std::cout << std::endl << std::endl;
-    }
+//     // UNCUT CELLS 
+//     if (!is_cut(msh, cl)) {
+//     //     auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+//     //     auto dependent_cells = cl.user_data.dependent_cells_neg;
+//     //     if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
+//     //         std::cout << "Positive side" << std::endl;
+//     //         nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+//     //         dependent_cells = cl.user_data.dependent_cells_pos;
+//     //     }
+//     //     else {
+//     //         std::cout << "Negative side" << std::endl;
+//     //     }
+//     //     auto offset_cl = offset(msh,cl);
+//     //     std::cout << "Uncut Cell: " << offset_cl << std::endl;
+//     //     std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
+//     //     std::cout << "Dependent cells:   ";
+//     //     for (auto& dp_cl : dependent_cells) {
+//     //         std::cout << dp_cl << "  ";
+//     //         auto dp_cell = msh.cells[dp_cl];
+//     //         auto fcs_dp = faces(msh, dp_cell);
+//     //         auto ns_dp  = normals(msh, dp_cell);
+//     //         fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+//     //         ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
+//     //     }
+//     //     std::cout << std::endl << std::endl;
+//     //     const auto num_faces = fcs.size();
+//     }
+//     // TKO NEG 
+//     else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
+//         // Adding the faces of the dependent terms
+//         auto nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+//         auto dependent_cells = cl.user_data.dependent_cells_pos;
+//         auto offset_cl = offset(msh,cl);
+//         std::cout << "TKO_NEG: " << offset_cl << std::endl;
+//         std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
+//         std::cout << "Dependent cells:   ";
+//         for (auto& dp_cl : dependent_cells) {
+//             std::cout << dp_cl << "  ";
+//             auto dp_cell = msh.cells[dp_cl];
+//             auto fcs_dp = faces(msh, dp_cell);
+//             auto ns_dp  = normals(msh, dp_cell);
+//             fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+//             ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
+//         }
+//         std::cout << std::endl << std::endl;
+//         auto num_faces = fcs.size();
+//     }
+//     // TKO_POS
+//     else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
+//         auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+//         auto dependent_cells = cl.user_data.dependent_cells_neg;
+//         auto offset_cl = offset(msh,cl);
+//         std::cout << "TKO_POS: " << offset_cl << std::endl;
+//         std::cout << "Number of dependant cells: " << nb_dp_cl << std::endl;
+//         std::cout << "Dependent cells:   ";
+//         for (auto& dp_cl : dependent_cells) {
+//             std::cout << dp_cl << "  ";
+//             auto dp_cell = msh.cells[dp_cl];
+//             auto fcs_dp = faces(msh, dp_cell);
+//             auto ns_dp  = normals(msh, dp_cell);
+//             fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+//             ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
+//         }
+//         std::cout << std::endl << std::endl;
+//     }
+//     // TOK
+//     else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
+//         auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
+//         auto dependent_cells = cl.user_data.dependent_cells_neg;        
+//         auto offset_cl = offset(msh,cl);
+//         std::cout << "TOK: " << offset_cl << std::endl;
+//         std::cout << "Number NEG of dependant cells: " << nb_dp_cl << std::endl;
+//         std::cout << "Dependent cells:   ";
+//         for (auto& dp_cl : dependent_cells) {
+//             std::cout << dp_cl << "  ";
+//             auto dp_cell = msh.cells[dp_cl];
+//             auto fcs_dp = faces(msh, dp_cell);
+//             auto ns_dp  = normals(msh, dp_cell);
+//             fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+//             ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
+//         }
+//         nb_dp_cl = cl.user_data.dependent_cells_pos.size(); // Number of dependent cells 
+//         dependent_cells = cl.user_data.dependent_cells_pos;
+//         std::cout << "Number POS of dependant cells: " << nb_dp_cl << std::endl;
+//         std::cout << "Dependent cells:   ";
+//         for (auto& dp_cl : dependent_cells) {
+//             std::cout << dp_cl << "  ";
+//             auto dp_cell = msh.cells[dp_cl];
+//             auto fcs_dp = faces(msh, dp_cell);
+//             auto ns_dp  = normals(msh, dp_cell);
+//             fcs.insert(fcs.end(), fcs_dp.begin(), fcs_dp.end());
+//             ns.insert(ns.end(), ns_dp.begin(), ns_dp.end());
+//         }
+//         std::cout << std::endl << std::endl;
+//     }
 
-    return  std::make_pair(fcs, ns);
-}
+//     return  std::make_pair(fcs, ns);
+// }
 
 
 template<typename T, size_t ET>

@@ -1613,7 +1613,7 @@ faces_extended_TOK(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, 
     auto offset_cl = offset(msh,cl);
     // std::cout << "TOK Cell: " << offset_cl << std::endl;
 
-    std::vector<typename cuthho_mesh<T, ET>::face_type> fcs;
+    std::vector<typename cuthho_mesh<T, ET>::face_type> fcs = faces(msh, cl);
     auto ns  = normals(msh, cl); 
     
     auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();

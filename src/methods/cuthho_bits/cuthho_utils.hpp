@@ -746,7 +746,7 @@ make_hho_stabilization_interface_TOK(const cuthho_mesh<T, ET>& msh,
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
 
     // Adding the faces of the dependent terms
-    auto num_faces = faces(msh, cl);
+    auto num_faces = faces(msh, cl).size();
     auto num_faces_neg = faces_extended_TOK(msh, cl, element_location::IN_NEGATIVE_SIDE).first.size();
     auto num_faces_pos = faces_extended_TOK(msh, cl, element_location::IN_POSITIVE_SIDE).first.size();
     auto num_faces_extended = num_faces_neg + num_faces_pos;
@@ -799,7 +799,7 @@ make_hho_stabilization_interface_TKO_NEG(const cuthho_mesh<T, ET>& msh,
     auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
 
-    auto num_faces = faces_extended_TKOibar(msh, cl, element_location::IN_NEGATIVE_SIDE).first.size();
+    auto num_faces = faces_extended_TKOibar(msh, cl, element_location::IN_POSITIVE_SIDE).first.size();
     // std::cout << "Dimension stabilization: " << 2*cbs+num_faces*fbs << std::endl;
     Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(2*cbs+num_faces*fbs, 2*cbs+num_faces*fbs);
     cell_basis<cuthho_mesh<T, ET>,T> cb(msh, cl, celdeg);
@@ -1101,7 +1101,8 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
     matrix_type rhs_tmp = matrix_type::Zero(gbs, cbs + num_faces*fbs);
     matrix_type gr_lhs  = matrix_type::Zero(gbs, gbs);
     matrix_type gr_rhs  = matrix_type::Zero(gbs, 2*cbs + (num_faces+num_faces_other_side)*fbs);
-
+    std::cout << "Nombre de ddl = " << 2*cbs + (num_faces+num_faces_other_side)*fbs << std::endl;
+    
     // Cell term 
     const auto qps = integrate(msh, cl, celdeg-1 + facdeg, where);
     for (auto& qp : qps) {
@@ -1153,13 +1154,13 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
         auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
         auto dependent_cells = cl.user_data.dependent_cells_neg;
         for (auto& dp_cl : dependent_cells) {
-            std::cout << "(TOK) AJOUT DU TERME D'INTERFACE POUR LA FACE DEPENDANTE: " << offset(msh, msh.cells[dp_cl]) << std::endl;
+            std::cout << "(TOK) AJOUT DU TERME D'INTERFACE POUR LA FACE DEPENDANTE: " << dp_cl << std::endl;
         }
     }
 
     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose()*oper;
-      
+
     return std::make_pair(oper, data);
 }
 
@@ -1190,17 +1191,20 @@ make_hho_gradrec_vector_interface_TKOi(const cuthho_mesh<T, ET>& msh,
 
     // Number of faces in TKOibar
     size_t num_faces_TKOibar;
-    if (where == element_location::IN_NEGATIVE_SIDE)
+    if (where == element_location::IN_NEGATIVE_SIDE) {
         num_faces_TKOibar = faces_extended_TKOibar(msh, cl, element_location::IN_POSITIVE_SIDE).first.size();
-    else if (where == element_location::IN_POSITIVE_SIDE)
+        std::cout << "(TKONEG) AJOUT DES TERMES DE CELLULES UTILISANT LA CELLULE PAIRED" << std::endl;
+    }
+    else if (where == element_location::IN_POSITIVE_SIDE) {
         num_faces_TKOibar = faces_extended_TKOibar(msh, cl, element_location::IN_NEGATIVE_SIDE).first.size();
+        std::cout << "(TKOPOS) AJOUT DES TERMES DE CELLULES UTILISANT LA CELLULE PAIRED" << std::endl;
+    }
 
     matrix_type rhs_tmp = matrix_type::Zero(gbs, cbs);
     matrix_type  gr_lhs = matrix_type::Zero(gbs, gbs);
     matrix_type  gr_rhs = matrix_type::Zero(gbs, 2*cbs + num_faces_TKOibar*fbs);
 
     // Cell term which involve pairing cell unknowns ???????????????
-    std::cout << "(TKOi) AJOUT DES TERMES DE CELLULES UTILISANT LA CELLULE PAIRED" << std::endl;
     const auto qps = integrate(msh, cl, celdeg - 1 + facdeg, where);
     for (auto& qp : qps) {
         const auto c_dphi = cb.eval_gradients(qp.first);
@@ -1217,7 +1221,6 @@ make_hho_gradrec_vector_interface_TKOi(const cuthho_mesh<T, ET>& msh,
     
     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
-
     return std::make_pair(oper, data);
 }
 
@@ -1302,7 +1305,7 @@ make_hho_gradrec_vector_interface_TKOibar(const cuthho_mesh<T, ET>& msh,
         auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
         auto dependent_cells = cl.user_data.dependent_cells_neg;
         for (auto& dp_cl : dependent_cells) {
-            std::cout << "(TKOibar) AJOUT DU TERME D'INTERFACE POUR LA FACE DEPENDANTE: " << offset(msh, msh.cells[dp_cl]) << std::endl;
+            std::cout << "(TKOibar) AJOUT DU TERME D'INTERFACE POUR LA FACE DEPENDANTE: " << dp_cl << std::endl;
         }
     }
     

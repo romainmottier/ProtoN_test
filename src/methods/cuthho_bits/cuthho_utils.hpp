@@ -1732,16 +1732,15 @@ Matrix<T, Dynamic, 1>
 project_function(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl,
                  hho_degree_info hdi, element_location where, const Function& f)
 {
+
     auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(hdi.cell_degree());
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(hdi.face_degree());
-
     auto fcs = faces(msh, cl);
     auto num_faces = fcs.size();
 
     Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
 
-    if ( location(msh, cl) != element_location::ON_INTERFACE &&
-         location(msh, cl) != where )
+    if (location(msh, cl)!=element_location::ON_INTERFACE && location(msh, cl) != where)
         return ret;
 
     Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), where);
@@ -1772,41 +1771,35 @@ project_function(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET
 template<typename T, size_t ET, typename Function>
 Matrix<T, Dynamic, 1>
 project_function_TOK(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl,
-                 hho_degree_info hdi, element_location where, const Function& f)
+                 hho_degree_info hdi, const Function& f)
 {
+
     auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(hdi.cell_degree());
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(hdi.face_degree());
+    auto num_faces = faces(msh, cl).size();
+    auto local_dofs = cbs+num_faces*fbs;
 
-    auto fcs = faces_extended_TOK(msh, cl, where).first;
-    auto num_faces = fcs.size();
+    auto dp_cells_neg = cl.user_data.dependent_cells_neg;
+    auto dp_cells_pos = cl.user_data.dependent_cells_pos;
+    auto nb_dp_cells = dp_cells_neg.size() + dp_cells_pos.size();
+    size_t extended_dofs = nb_dp_cells*local_dofs;
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(2*local_dofs+extended_dofs);
 
-    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
+    //////////////////////////////////////// Projection on local dofs 
+    ret.block(0, 0, local_dofs, 1)          = project_function(msh, cl, hdi, element_location::IN_NEGATIVE_SIDE, f);
+    ret.block(local_dofs, 0, local_dofs, 1) = project_function(msh, cl, hdi, element_location::IN_POSITIVE_SIDE, f);
 
-    if ( location(msh, cl) != element_location::ON_INTERFACE &&
-         location(msh, cl) != where )
-        return ret;
-
-    // Projection on cell
-    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), where);
-    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, hdi.cell_degree(), f, where);
-    ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
-
-    // Projection faces
-    for (size_t i = 0; i < num_faces; i++)
-    {
-        auto fc = fcs[i];
-
-        if ( location(msh, fc) != element_location::ON_INTERFACE &&
-             location(msh, fc) != where )
-        {
-            ret.block(cbs+i*fbs, 0, fbs, 1) = Matrix<T, Dynamic, 1>::Zero(fbs);
-        }
-        else
-        {
-            Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), where);
-            Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, hdi.face_degree(), where, f);
-            ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
-        }
+    //////////////////////////////////////// Projection on extended dofs 
+    size_t i = 1; //cpt
+    // Projection on negative dependant cells 
+    for (auto &dp_cl : cl.user_data.dependent_cells_neg) {
+        ret.block(i*local_dofs, 0, local_dofs, 1) = project_function(msh, msh.cells[dp_cl], hdi, element_location::IN_NEGATIVE_SIDE, f);
+        i = i+1;
+    }
+    // Projection on positive dependant cells 
+    for (auto &dp_cl : cl.user_data.dependent_cells_pos) {
+        ret.block(i*local_dofs, 0, local_dofs, 1) = project_function(msh, msh.cells[dp_cl], hdi, element_location::IN_POSITIVE_SIDE, f);
+        i = i+1;
     }
 
     return ret;
@@ -1852,48 +1845,29 @@ Matrix<T, Dynamic, 1>
 project_function_TKOibar(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl,
                  hho_degree_info hdi, element_location where, const Function& f)
 {
+
     auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(hdi.cell_degree());
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(hdi.face_degree());
+    auto num_faces = faces(msh, cl).size();
+    auto local_dofs = cbs+num_faces*fbs;
 
-    std::vector<typename cuthho_mesh<T, ET>::face_type> fcs;
-    if (where == element_location::IN_NEGATIVE_SIDE) {
-        // auto offset_cl = offset(msh, cl);
-        // std::cout << "Projection on TKO POS cell: " << offset_cl << std::endl;
-        fcs = faces_extended_TKOibar(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
+    auto dp_cells = cl.user_data.dependent_cells_neg;
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        dp_cells = cl.user_data.dependent_cells_pos;
     }
-    else {
-        // auto offset_cl = offset(msh, cl);
-        // std::cout << "Projection on TKO NEG cell: " << offset_cl << std::endl;
-        fcs = faces_extended_TKOibar(msh, cl, element_location::IN_POSITIVE_SIDE).first;
-    }
-    auto num_faces = fcs.size();
+    auto nb_dp_cells = dp_cells.size();
+    size_t extended_dofs = nb_dp_cells*local_dofs;
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(local_dofs+extended_dofs);
 
-    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
+    //////////////////////////////////////// Projection on local dofs 
+    ret.block(0, 0, local_dofs, 1) = project_function(msh, cl, hdi, where, f);
 
-    if ( location(msh, cl) != element_location::ON_INTERFACE &&
-         location(msh, cl) != where )
-        return ret;
-
-    // Projection on cell
-    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), where);
-    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, hdi.cell_degree(), f, where);
-    ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
-
-    // Projection faces
-    for (size_t i = 0; i < num_faces; i++)
-    {
-        auto fc = fcs[i];
-        if ( location(msh, fc) != element_location::ON_INTERFACE &&
-             location(msh, fc) != where )
-        {
-            ret.block(cbs+i*fbs, 0, fbs, 1) = Matrix<T, Dynamic, 1>::Zero(fbs);
-        }
-        else
-        {
-            Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), where);
-            Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, hdi.face_degree(), where, f);
-            ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
-        }
+    //////////////////////////////////////// Projection on extended dofs 
+    size_t i = 1; //cpt
+    // Projection on dependant cells 
+    for (auto &dp_cl : dp_cells) {
+        ret.block(i*local_dofs, 0, local_dofs, 1) = project_function(msh, msh.cells[dp_cl], hdi, where, f);
+        i = i+1;
     }
 
     return ret;
@@ -1902,57 +1876,46 @@ project_function_TKOibar(const cuthho_mesh<T, ET>& msh, const typename cuthho_me
 template<typename T, size_t ET, typename Function>
 Matrix<T, Dynamic, 1>
 project_function_uncut(const cuthho_mesh<T, ET>& msh, const typename cuthho_mesh<T, ET>::cell_type& cl,
-                 hho_degree_info hdi, const Function& f)
+                 hho_degree_info hdi, element_location where, const Function& f)
 {
     
+    size_t di = 0;
+
     auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(hdi.cell_degree());
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(hdi.face_degree());
-    
-    auto fcs = faces_extended_uncut(msh, cl).first;
+    auto fcs = faces(msh, cl);
     auto num_faces = fcs.size();
-    
-    element_location where;
-    if (cl.user_data.location == element_location::IN_NEGATIVE_SIDE) {
-        // auto offset_cl = offset(msh, cl);
-        where = element_location::IN_NEGATIVE_SIDE;
-        // std::cout << "Projection on uncut cell in - domain: " << offset_cl << std::endl;
-    }
-    else if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
-        // auto offset_cl = offset(msh, cl);
-        where = element_location::IN_POSITIVE_SIDE;
-        // std::cout << "Projection on uncut cell in + domain: " << offset_cl << std::endl;
-    }
+    auto local_dofs = cbs+num_faces*fbs;
 
-    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
+    auto dp_cells = cl.user_data.dependent_cells_neg;
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        auto dp_cells = cl.user_data.dependent_cells_pos;
+    }
+    auto nb_dp_cells = dp_cells.size();
+    size_t extended_dofs = nb_dp_cells*local_dofs;
 
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(local_dofs+extended_dofs);
+
+    //////////////////////////////////////// Projection on local dofs 
     // Projection on cell
-    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), where);
-    // std::cout << "MASS MATRIX SIZE = " << cell_mm.size() << std::endl;
-    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, hdi.cell_degree(), f, where);
+    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, hdi.cell_degree(), di);
+    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, hdi.cell_degree(), f, di);
     ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
-
+    // Projection on faces
     for (size_t i = 0; i < num_faces; i++)
     {
         auto fc = fcs[i];
-        if (i>3) {
-            if ( location(msh, fc) != element_location::ON_INTERFACE &&
-                location(msh, fc) != where )
-            {
-            ret.block(cbs+i*fbs, 0, fbs, 1) = Matrix<T, Dynamic, 1>::Zero(fbs);
-            }
-            else
-            {
-                Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), where);
-                Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, hdi.face_degree(), where, f);
-                ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
-            }
-        }
-        else {
-            Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), where);
-            Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, hdi.face_degree(), where, f);
-            ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
-        }
+        Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, hdi.face_degree(), di);
+        Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, hdi.face_degree(), f, di);
+        ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
+    }
 
+    //////////////////////////////////////// Projection on extended dofs 
+    size_t i = 1; //cpt
+    for (auto &dp_cl : cl.user_data.dependent_cells_neg) {
+        // Projection on dependant cells 
+        ret.block(i*local_dofs, 0, local_dofs, 1) = project_function(msh, msh.cells[dp_cl], hdi, where, f);
+        i = i+1;
     }
 
     return ret;

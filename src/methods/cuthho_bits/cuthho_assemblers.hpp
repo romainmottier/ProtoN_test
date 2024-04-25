@@ -1640,35 +1640,103 @@ public:
             auto facdeg = hdi.face_degree();
             auto cbs   = cell_basis<Mesh,T>::size(celdeg);
             auto fbs   = face_basis<Mesh,T>::size(facdeg);
-            if (!is_cut(msh, cl)) {
-                // std::cout << "Cell: " << offset(msh, cl) << std::endl;
+            auto num_faces = faces(msh, cl).size();
+            auto dofs = 0;
+            if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_NEGATIVE_SIDE) {
+                // std::cout << "UNCUT NEGATIVE CELL: " << offset(msh, cl) << std::endl;
                 cl.user_data.cell_offset_ddl = offset_ddl;
-                // std::cout << "Offset: " << offset_ddl << std::endl;        
-                auto fcs = faces_extended_uncut(msh, cl).first;
-                offset_ddl += cbs + fcs.size()*fbs;
+                // std::cout << "Offset: " << offset_ddl << std::endl;       
+                // Adding the local cell and face unknowns 
+                dofs += cbs + num_faces*fbs;
+                // Loop over depcbs + num_faces*fbsendant cells 
+                // std::cout << "Dependant cells:   ";
+                for (auto &dp_cl : cl.user_data.dependent_cells_neg) {
+                    // std::cout << dp_cl << "   ";
+                    num_faces = faces(msh, msh.cells[dp_cl]).size();
+                    dofs += cbs + num_faces*fbs; 
+                }
+                offset_ddl += dofs;
+                cl.user_data.dofs = dofs;
+                // std::cout << std::endl << std::endl;
+            }
+            else if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
+                // std::cout << "UNCUT POSITIVE CELL: " << offset(msh, cl) << std::endl;
+                cl.user_data.cell_offset_ddl = offset_ddl;
+                // std::cout << "Offset: " << offset_ddl << std::endl;       
+                // Adding the local cell and face unknowns 
+                dofs += cbs + num_faces*fbs; 
+                // Loop over dependant cells 
+                // std::cout << "Dependant cells:   ";
+                for (auto &dp_cl : cl.user_data.dependent_cells_pos) {
+                    // std::cout << dp_cl << "   ";
+                    num_faces = faces(msh, msh.cells[dp_cl]).size();
+                    dofs += cbs + num_faces*fbs; 
+                }
+                offset_ddl += dofs;
+                cl.user_data.dofs = dofs;
+                // std::cout << std::endl << std::endl;
             }
             else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
+                // std::cout << "TOK CELL: " << offset(msh, cl) << std::endl;
                 cl.user_data.cell_offset_ddl = offset_ddl;   
-                // std::cout << "Offset: " << offset << std::endl;  
-                auto fcs = faces(msh, cl);
-                auto fcs_neg = faces_extended_TOK(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
-                auto fcs_pos = faces_extended_TOK(msh, cl, element_location::IN_POSITIVE_SIDE).first;
-                offset_ddl += 2*cbs + (2*fcs.size() + fcs_neg.size() + fcs_pos.size())*fbs;
+                // std::cout << "Offset: " << offset_ddl << std::endl;      
+                // Adding the local cell and face unknowns 
+                dofs += 2*(cbs + num_faces*fbs);                
+                // Loop over negative dependant cells 
+                // std::cout << "Negative dependant cells:   ";
+                for (auto &dp_cl : cl.user_data.dependent_cells_neg) {
+                    // std::cout << dp_cl << "   ";
+                    num_faces = faces(msh, msh.cells[dp_cl]).size();
+                    dofs += cbs + num_faces*fbs; 
+                }
+                offset_ddl += dofs;
+                cl.user_data.dofs = dofs;
+                // std::cout << std::endl;
+                // Loop over positive dependant cells 
+                // std::cout << "Positive dependant cells:   ";
+                for (auto &dp_cl : cl.user_data.dependent_cells_pos) {
+                    // std::cout << dp_cl << "   ";
+                    num_faces = faces(msh, msh.cells[dp_cl]).size();
+                    offset_ddl += cbs + num_faces*fbs; 
+                }
+                // std::cout << std::endl << std::endl;
             }
             else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
-                cl.user_data.cell_offset_ddl = offset_ddl;        
-                // std::cout << "Offset: " << offset << std::endl;  
-                auto fcs = faces_extended_TKOibar(msh, cl, element_location::IN_POSITIVE_SIDE).first;
-                offset_ddl += 2*cbs + fcs.size()*fbs;
+                // std::cout << "TKONEG CELL: " << offset(msh, cl) << std::endl;
+                cl.user_data.cell_offset_ddl = offset_ddl;   
+                // std::cout << "Offset: " << offset_ddl << std::endl;      
+                // Adding the local cell and face unknowns 
+                dofs += cbs + num_faces*fbs;                
+                // Loop over positive dependant cells 
+                // std::cout << "Positive dependant cells:   ";
+                for (auto &dp_cl : cl.user_data.dependent_cells_pos) {
+                    // std::cout << dp_cl << "   ";
+                    num_faces = faces(msh, msh.cells[dp_cl]).size();
+                    dofs += cbs + num_faces*fbs; 
+                }
+                offset_ddl += dofs;
+                cl.user_data.dofs = dofs;
+                // std::cout << std::endl << std::endl;
             }        
             else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-                cl.user_data.cell_offset_ddl = offset_ddl;      
-                // std::cout << "Offset: " << offset << std::endl;      
-                auto fcs = faces_extended_TKOibar(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
-                offset_ddl += 2*cbs + fcs.size()*fbs;
+                // std::cout << "TKONEG CELL: " << offset(msh, cl) << std::endl;
+                cl.user_data.cell_offset_ddl = offset_ddl;   
+                // std::cout << "Offset: " << offset_ddl << std::endl;      
+                // Adding the local cell and face unknowns 
+                dofs += cbs + num_faces*fbs;                
+                // Loop over positive dependant cells 
+                // std::cout << "Negative dependant cells:   ";
+                for (auto &dp_cl : cl.user_data.dependent_cells_neg) {
+                    // std::cout << dp_cl << "   ";
+                    num_faces = faces(msh, msh.cells[dp_cl]).size();
+                    dofs += cbs + num_faces*fbs; 
+                }
+                offset_ddl += dofs;
+                cl.user_data.dofs = dofs;
+                // std::cout << std::endl << std::endl;
             }
-
-            // std::cout << "offset_ddl " << cl.user_data.cell_offset_ddl << std::endl;
+            // std::cout << "cell = " << offset(msh, cl) << std::endl;
+            // std::cout << "dofs = " << cl.user_data.dofs << std::endl << std::endl;
         }
         // Vérif n_dofs
         auto n_dofs = 0;
@@ -1706,61 +1774,42 @@ public:
             auto facdeg = this->di.face_degree();
             auto cbs = cell_basis<Mesh,T>::size(celdeg);
             auto fbs = face_basis<Mesh,T>::size(facdeg);
-            if (location(msh, cl) != element_location::ON_INTERFACE){    
-                // std::cout << "Cell: " << offset(msh,cl) << std::endl;        
-                auto fcs = faces_extended_uncut(msh, cl).first;
-                auto num_faces = fcs.size();
-                Matrix<T, Dynamic, 1> x_proj_dof = project_function_uncut(msh, cl, hho_di, scal_fun);
-                x_glob.block(cl.user_data.cell_offset_ddl, 0, cbs + num_faces*fbs, 1) = x_proj_dof.block(0, 0, cbs + num_faces*fbs, 1);
-                // std::cout << "Number of dofs: " << cbs + num_faces*fbs << std::endl;
-                // std::cout << x_glob.block(cl.user_data.cell_offset_ddl, 0, cbs + num_faces*fbs, 1) << std::endl;
+            auto offset_cl = cl.user_data.cell_offset_ddl;
+            auto dofs = cl.user_data.dofs;
+            // std::cout << "cell = " << offset(msh, cl) << std::endl;
+            // std::cout << "offset = " << offset_cl << std::endl;
+            // std::cout << "dofs = " << dofs << std::endl << std::endl;
+            if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_NEGATIVE_SIDE){    
+                Matrix<T, Dynamic, 1> x_proj_dof = project_function_uncut(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
+                x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
+                // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
             }
-            else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
-                // std::cout << "Cell: " << offset(msh,cl) << std::endl;        
-                auto fcs_neg = faces_extended_TOK(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
-                auto fcs_pos = faces_extended_TOK(msh, cl, element_location::IN_POSITIVE_SIDE).first;
-                auto num_faces_neg = fcs_neg.size();
-                auto num_faces_pos = fcs_pos.size();
-                Matrix<T, Dynamic, 1> x_neg_proj_dof = project_function_TOK(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
-                Matrix<T, Dynamic, 1> x_pos_proj_dof = project_function_TOK(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
-                x_glob.block(cl.user_data.cell_offset_ddl, 0, cbs, 1) = x_neg_proj_dof.block(0, 0, cbs, 1);     // cbs in negative side 
-                x_glob.block(cl.user_data.cell_offset_ddl+cbs, 0, cbs, 1) = x_pos_proj_dof.block(0, 0, cbs, 1); // cbs in positive side
-                x_glob.block(cl.user_data.cell_offset_ddl+2*cbs, 0, fbs*num_faces_neg, 1) = x_neg_proj_dof.block(cbs, 0, fbs*num_faces_neg, 1);                      // fbs in negative side 
-                x_glob.block(cl.user_data.cell_offset_ddl+2*cbs + fbs*num_faces_neg, 0, fbs*num_faces_pos, 1) = x_pos_proj_dof.block(cbs, 0, fbs*num_faces_pos, 1); // fbs in positive side 
-                // std::cout << "Number of dofs: " << 2*cbs + (num_faces_neg+num_faces_pos)*fbs << std::endl;
-                // std::cout << x_glob.block(cl.user_data.cell_offset_ddl, 0, 2*cbs + (num_faces_neg+num_faces_pos)*fbs, 1) << std::endl;
+            else if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_POSITIVE_SIDE){    
+                Matrix<T, Dynamic, 1> x_proj_dof = project_function_uncut(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
+                x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
+                // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
+            }
+            else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {    
+                Matrix<T, Dynamic, 1> x_proj_dof = project_function_TOK(msh, cl, hho_di, scal_fun);
+                x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
+                // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
             }
             else {
                 if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
-                    // std::cout << "Cell: " << offset(msh,cl) << std::endl;                    
-                    auto fcs_pos = faces_extended_TKOibar(msh, cl, element_location::IN_POSITIVE_SIDE).first;
-                    auto num_faces_pos = fcs_pos.size();   
-                    Matrix<T, Dynamic, 1> x_neg_proj_dof = project_function_TKOi(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
-                    Matrix<T, Dynamic, 1> x_pos_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
-                    x_glob.block(cl.user_data.cell_offset_ddl, 0, cbs, 1) = x_neg_proj_dof;                         // cbs in negative side 
-                    x_glob.block(cl.user_data.cell_offset_ddl+cbs, 0, cbs, 1) = x_pos_proj_dof.block(0, 0, cbs, 1); // cbs in positive side
-                    x_glob.block(cl.user_data.cell_offset_ddl+2*cbs, 0, fbs*num_faces_pos, 1) = x_pos_proj_dof.block(cbs, 0, fbs*num_faces_pos, 1); // fbs in positive side 
-                    // std::cout << "Number of dofs: " << 2*cbs + num_faces_pos*fbs << std::endl;
-                    // std::cout << x_glob.block(cl.user_data.cell_offset_ddl, 0, 2*cbs + num_faces_pos*fbs, 1) << std::endl;
+                    Matrix<T, Dynamic, 1> x_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
+                    x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
+                    // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
                 }
-                if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-                    // std::cout << "Cell: " << offset(msh,cl) << std::endl;                    
-                    auto fcs_neg = faces_extended_TKOibar(msh, cl, element_location::IN_NEGATIVE_SIDE).first;
-                    auto num_faces_neg = fcs_neg.size();   
-                    Matrix<T, Dynamic, 1> x_neg_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
-                    Matrix<T, Dynamic, 1> x_pos_proj_dof = project_function_TKOi(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
-                    x_glob.block(cl.user_data.cell_offset_ddl, 0, cbs, 1) = x_neg_proj_dof.block(0, 0, cbs, 1);                         // cbs in negative side 
-                    x_glob.block(cl.user_data.cell_offset_ddl+cbs, 0, cbs, 1) = x_pos_proj_dof; // cbs in positive side
-                    x_glob.block(cl.user_data.cell_offset_ddl+2*cbs, 0, fbs*num_faces_neg, 1) = x_neg_proj_dof.block(cbs, 0, fbs*num_faces_neg, 1); // fbs in positive side 
-                    // std::cout << "Number of dofs: " << 2*cbs + num_faces_neg*fbs << std::endl;
-                    // std::cout << x_glob.block(cl.user_data.cell_offset_ddl, 0, 2*cbs + num_faces_neg*fbs, 1) << std::endl;
+                else {
+                    Matrix<T, Dynamic, 1> x_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
+                    x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
+                    // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
                 }
             }
         }
 
-        // std::cout << x_glob << std::endl;
-        // std::cout << std::endl << x_glob.size() << std::endl;
-        // std::cout << "MAKE_PROJECTION_OPERATOR" << std::endl;
+        // std::cout << std::endl << "System size = " << x_glob.size() << std::endl;
+        // std::cout << "MAKE_PROJECTION_OPERATOR ok" << std::endl;
 
         return x_glob;
     }

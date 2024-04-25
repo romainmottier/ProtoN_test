@@ -79,8 +79,8 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
       //////////
       
       auto contrib = method.make_contrib(msh, cell, test_case, hdi);
-      auto lc = contrib.first;
-      auto f = contrib.second;
+      // auto lc = contrib.first;
+      // auto f = contrib.second;
     }
 
     

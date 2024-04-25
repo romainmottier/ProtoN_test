@@ -557,8 +557,6 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
         }
         // Interface term of the extended cells
         if (cl.user_data.location == element_location::IN_NEGATIVE_SIDE) {
-            auto nb_dp_cl = cl.user_data.dependent_cells_neg.size();
-            auto dependent_cells = cl.user_data.dependent_cells_neg;
             std::cout << "(UNCUT) AJOUTER LES TERMES D'INTERFACE POUR LES CELLULES DEPENDANTES: " << offset(msh, msh.cells[dp_cl]) << std::endl;
         }
         cpt++;

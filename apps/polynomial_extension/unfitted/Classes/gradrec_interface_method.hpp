@@ -31,7 +31,9 @@ public:
         std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>,
                   Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>> gr_n;        
         std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>,
-                  Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>> gr_p;
+                  Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>> gr_p;     
+        std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>,
+                  Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>> gr;
         // Stabilization
         Mat stab;
         auto stab_parms = test_case.parms;
@@ -40,10 +42,10 @@ public:
 
         if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
             // Gradient reconstruction
-            gr_n = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE, 1.0);
-            gr_p = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE, 0.0);
+            gr = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, 1.0);
             // Stabilization
-            stab = make_hho_stabilization_interface_TOK(msh, cl, level_set_function, hdi, stab_parms);  
+            // stab = make_hho_stabilization_interface_TOK(msh, cl, level_set_function, hdi, stab_parms);
+            stab = Matrix<T, Dynamic, Dynamic>::Zero(cl.user_data.dofs, cl.user_data.dofs);  
         }
         if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) { 
             // Gradient reconstruction
@@ -72,7 +74,7 @@ public:
         std::cout << "DIMENSION STAB: " << stab.size() << std::endl;
         std::cout << "DIMENSION GRADREC NEG: " << gr_n.second.size() << std::endl;
         std::cout << "DIMENSION GRADREC POS: " << gr_p.second.size() << std::endl;
-        Mat lc = stab + stab_parms.kappa_1*gr_n.second + stab_parms.kappa_2*gr_p.second; 
+        Mat lc = stab;// + stab_parms.kappa_1*gr_n.second + stab_parms.kappa_2*gr_p.second; 
         // std::cout << "TEST 2 " << std::endl; 
         
         ///////////////    RHS

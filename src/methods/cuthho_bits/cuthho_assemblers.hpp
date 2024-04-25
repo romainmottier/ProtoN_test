@@ -1689,16 +1689,16 @@ public:
                     num_faces = faces(msh, msh.cells[dp_cl]).size();
                     dofs += cbs + num_faces*fbs; 
                 }
-                offset_ddl += dofs;
-                cl.user_data.dofs = dofs;
                 // std::cout << std::endl;
                 // Loop over positive dependant cells 
                 // std::cout << "Positive dependant cells:   ";
                 for (auto &dp_cl : cl.user_data.dependent_cells_pos) {
                     // std::cout << dp_cl << "   ";
                     num_faces = faces(msh, msh.cells[dp_cl]).size();
-                    offset_ddl += cbs + num_faces*fbs; 
+                    dofs += cbs + num_faces*fbs; 
                 }
+                offset_ddl += dofs;
+                cl.user_data.dofs = dofs;
                 // std::cout << std::endl << std::endl;
             }
             else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {

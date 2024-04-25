@@ -57,7 +57,7 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
     auto level_set_function = test_case.level_set_;
 
     auto rhs_fun = test_case.rhs_fun;
-    auto sol_fun = test_case.sol_fun;
+    auto sol_fun = test_case.sol_fun;   
     auto sol_grad = test_case.sol_grad;
     auto bcs_fun = test_case.bcs_fun;
     auto dirichlet_jump = test_case.dirichlet_jump;

@@ -78,7 +78,7 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
       std::cout << "Cell: " << offset_cl << std::endl;
       //////////
       
-      auto contrib = method.make_contrib(msh, cell, test_case, hdi);
+      // auto contrib = method.make_contrib(msh, cell, test_case, hdi);
       // auto lc = contrib.first;
       // auto f = contrib.second;
     }

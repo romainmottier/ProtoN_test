@@ -42,7 +42,8 @@ public:
 
         if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
             // Gradient reconstruction
-            gr = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, 1.0);
+            gr_n = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE, 1.0);
+            gr_p = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE, 0.0);
             // Stabilization
             // stab = make_hho_stabilization_interface_TOK(msh, cl, level_set_function, hdi, stab_parms);
             stab = Matrix<T, Dynamic, Dynamic>::Zero(cl.user_data.dofs, cl.user_data.dofs);  

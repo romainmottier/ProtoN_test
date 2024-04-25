@@ -1779,28 +1779,28 @@ public:
             // std::cout << "cell = " << offset(msh, cl) << std::endl;
             // std::cout << "offset = " << offset_cl << std::endl;
             // std::cout << "dofs = " << dofs << std::endl << std::endl;
-            if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_NEGATIVE_SIDE){    
+            if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_NEGATIVE_SIDE) {    
                 Matrix<T, Dynamic, 1> x_proj_dof = project_function_uncut(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
                 x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
                 // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
             }
-            else if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_POSITIVE_SIDE){    
+            else if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_POSITIVE_SIDE) {   
                 Matrix<T, Dynamic, 1> x_proj_dof = project_function_uncut(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
                 x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
                 // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
             }
-            else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {    
+            else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {     
                 Matrix<T, Dynamic, 1> x_proj_dof = project_function_TOK(msh, cl, hho_di, scal_fun);
                 x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
                 // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
             }
             else {
-                if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
+                if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) { 
                     Matrix<T, Dynamic, 1> x_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
                     x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
                     // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
                 }
-                else {
+                else { 
                     Matrix<T, Dynamic, 1> x_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
                     x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
                     // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;

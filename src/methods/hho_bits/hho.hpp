@@ -244,7 +244,7 @@ make_hho_naive_stabilization_extended(const Mesh& msh, const typename Mesh::cell
     }
     auto nb_dp_cells = dp_cells.size();
     auto extended_dofs = local_dofs*nb_dp_cells;
-    auto n_dofs = local_dofs + extended_dofs;
+    auto n_dofs = cl.user_data.dofs;
 
     Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(n_dofs, n_dofs);
     Matrix<T, Dynamic, Dynamic> If   = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);

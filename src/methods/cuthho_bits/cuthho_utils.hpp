@@ -1363,14 +1363,10 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
             rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n*c_phi.transpose();
         }
     }
-    if (where == element_location::IN_NEGATIVE_SIDE) {
-        gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-        gr_rhs.block(0, cbs, gbs, num_faces*fbs) += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
-    }
-    if (where == element_location::IN_POSITIVE_SIDE) {
-        gr_rhs.block(0, local_dofs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-        gr_rhs.block(0, local_dofs+cbs, gbs, num_faces*fbs) += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
-    }
+    if (where == element_location::IN_NEGATIVE_SIDE)
+        gr_rhs.block(0, 0, gbs, local_dofs) += rhs_tmp.block(0, 0, gbs, local_dofs);
+    if (where == element_location::IN_POSITIVE_SIDE) 
+        gr_rhs.block(0, local_dofs, gbs, local_dofs) += rhs_tmp.block(0, 0, gbs, local_dofs);
 
     ////////////////////////////////////////////////// INTERFACE TERM CURRENT CELL
     if (where == element_location::IN_NEGATIVE_SIDE) {
@@ -1388,11 +1384,11 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
         gr_rhs.block(0, local_dofs, gbs, cbs) += interface_term.block(0, cbs, gbs, cbs); // pos terms
     }
 
-    
     ////////////////////////////////////////////////// DEPENDENT CELLS 
     auto dp_cells = cl.user_data.dependent_cells_neg;
     if (where == element_location::IN_POSITIVE_SIDE)
         dp_cells = cl.user_data.dependent_cells_pos;
+
     size_t extended_dofs = dp_cells.size()*local_dofs;
     rhs_tmp = matrix_type::Zero(gbs, extended_dofs);
 
@@ -1422,8 +1418,8 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
                 const vector_type f_phi      = fb.eval_basis(qp.first);
                 const auto        g_phi      = gb.eval_basis(qp.first);
                 const vector_type qp_g_phi_n = qp.second * g_phi * n;
-                gr_rhs.block(0, cpt*local_dofs + cbs + i*fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose(); // Extended cell terms
-                gr_rhs.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose(); // Current cell terms
+                rhs_tmp.block(0, cpt*local_dofs + cbs + i*fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose(); // Extended cell terms
+                rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose(); // Current cell terms
             }
         }
         
@@ -1462,59 +1458,81 @@ make_hho_gradrec_vector_interface_TKOi(const cuthho_mesh<T, ET>& msh,
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
     typedef Matrix<T, Dynamic, 1>       vector_type;
 
-    const auto celdeg  = di.cell_degree();
-    const auto facdeg  = di.face_degree();
     const auto graddeg = di.grad_degree();
-
-    cell_basis<cuthho_mesh<T, ET>,T>            cb(msh, cl, celdeg);
-    vector_cell_basis<cuthho_mesh<T, ET>,T>     gb(msh, cl, graddeg);
-
-    auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
-    auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
     auto gbs = vector_cell_basis<cuthho_mesh<T, ET>,T>::size(graddeg);
-
-    // // Number of faces in TKOibar
-    // size_t num_faces_TKOibar;
-    // if (where == element_location::IN_NEGATIVE_SIDE) {
-    //     num_faces_TKOibar = faces_extended_TKOibar(msh, cl, element_location::IN_POSITIVE_SIDE).first.size();
-    //     std::cout << "(TKONEG) AJOUT DES TERMES DE CELLULES UTILISANT LA CELLULE PAIRED" << std::endl;
-    // }
-    // else if (where == element_location::IN_POSITIVE_SIDE) {
-    //     num_faces_TKOibar = faces_extended_TKOibar(msh, cl, element_location::IN_NEGATIVE_SIDE).first.size();
-    //     std::cout << "(TKOPOS) AJOUT DES TERMES DE CELLULES UTILISANT LA CELLULE PAIRED" << std::endl;
-    // }
-
-    // matrix_type rhs_tmp = matrix_type::Zero(gbs, cbs);
-    // matrix_type  gr_lhs = matrix_type::Zero(gbs, gbs);
-    // matrix_type  gr_rhs = matrix_type::Zero(gbs, 2*cbs + num_faces_TKOibar*fbs);
-
-    // // Cell term which involve pairing cell unknowns ???????????????
-    // const auto qps = integrate(msh, cl, celdeg - 1 + facdeg, where);
-    // for (auto& qp : qps) {
-    //     const auto c_dphi = cb.eval_gradients(qp.first);
-    //     const auto g_phi  = gb.eval_basis(qp.first);
-    //     gr_lhs.block(0, 0, gbs, gbs)  += qp.second * g_phi * g_phi.transpose();     // mass matrix
-    //     rhs_tmp.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose();
-    // }
-    // if(where == element_location::IN_NEGATIVE_SIDE) {
-    //     gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-    // }
-    // else if(where == element_location::IN_POSITIVE_SIDE) {
-    //     gr_rhs.block(0, cbs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
-    // }
+    auto ndofs = cl.user_data.dofs;
     
-    // matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
-    // matrix_type data = gr_rhs.transpose() * oper;
-
-
-    // New size
-    // matrix_type oper = matrix_type::Zero(gbs, 2*cbs + num_faces_TKOibar*fbs);
-    // matrix_type data = matrix_type::Zero(2*cbs + num_faces_TKOibar*fbs, 2*cbs + num_faces_TKOibar*fbs);
-    matrix_type oper = matrix_type::Zero(gbs, cl.user_data.dofs);
-    matrix_type data = matrix_type::Zero(cl.user_data.dofs, cl.user_data.dofs);
+    matrix_type oper = matrix_type::Zero(gbs, ndofs);
+    matrix_type data = matrix_type::Zero(ndofs, ndofs);
 
     return std::make_pair(oper, data);
 }
+
+// template<typename T, size_t ET, typename Function>
+// std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>,
+//           Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>>
+// make_hho_gradrec_vector_interface_TKOi(const cuthho_mesh<T, ET>& msh,
+//                                   const typename cuthho_mesh<T, ET>::cell_type& cl,
+//                                   const Function& level_set_function, const hho_degree_info& di,
+//                                   element_location where) {
+
+//     if ( !is_cut(msh, cl) )
+//         throw std::invalid_argument("The cell is not cut");
+
+//     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+//     typedef Matrix<T, Dynamic, 1>       vector_type;
+
+//     // const auto celdeg  = di.cell_degree();
+//     // const auto facdeg  = di.face_degree();
+//     // const auto graddeg = di.grad_degree();
+
+//     // cell_basis<cuthho_mesh<T, ET>,T>            cb(msh, cl, celdeg);
+//     // vector_cell_basis<cuthho_mesh<T, ET>,T>     gb(msh, cl, graddeg);
+
+//     // auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
+//     // auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
+//     // auto gbs = vector_cell_basis<cuthho_mesh<T, ET>,T>::size(graddeg);
+
+//     // // Number of faces in TKOibar
+//     // size_t num_faces_TKOibar;
+//     // if (where == element_location::IN_NEGATIVE_SIDE) {
+//     //     num_faces_TKOibar = faces_extended_TKOibar(msh, cl, element_location::IN_POSITIVE_SIDE).first.size();
+//     //     std::cout << "(TKONEG) AJOUT DES TERMES DE CELLULES UTILISANT LA CELLULE PAIRED" << std::endl;
+//     // }
+//     // else if (where == element_location::IN_POSITIVE_SIDE) {
+//     //     num_faces_TKOibar = faces_extended_TKOibar(msh, cl, element_location::IN_NEGATIVE_SIDE).first.size();
+//     //     std::cout << "(TKOPOS) AJOUT DES TERMES DE CELLULES UTILISANT LA CELLULE PAIRED" << std::endl;
+//     // }
+
+//     // matrix_type rhs_tmp = matrix_type::Zero(gbs, cbs);
+//     // matrix_type  gr_lhs = matrix_type::Zero(gbs, gbs);
+//     // matrix_type  gr_rhs = matrix_type::Zero(gbs, 2*cbs + num_faces_TKOibar*fbs);
+
+//     // // Cell term which involve pairing cell unknowns ???????????????
+//     // const auto qps = integrate(msh, cl, celdeg - 1 + facdeg, where);
+//     // for (auto& qp : qps) {
+//     //     const auto c_dphi = cb.eval_gradients(qp.first);
+//     //     const auto g_phi  = gb.eval_basis(qp.first);
+//     //     gr_lhs.block(0, 0, gbs, gbs)  += qp.second * g_phi * g_phi.transpose();     // mass matrix
+//     //     rhs_tmp.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose();
+//     // }
+//     // if(where == element_location::IN_NEGATIVE_SIDE) {
+//     //     gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
+//     // }
+//     // else if(where == element_location::IN_POSITIVE_SIDE) {
+//     //     gr_rhs.block(0, cbs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
+//     // }
+    
+//     // matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
+//     // matrix_type data = gr_rhs.transpose() * oper;
+
+
+//     // New size
+//     // matrix_type oper = matrix_type::Zero(gbs, 2*cbs + num_faces_TKOibar*fbs);
+//     // matrix_type data = matrix_type::Zero(2*cbs + num_faces_TKOibar*fbs, 2*cbs + num_faces_TKOibar*fbs);
+
+//     return std::make_pair(oper, data);
+// }
 
 template<typename T, size_t ET, typename Function>
 std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>,

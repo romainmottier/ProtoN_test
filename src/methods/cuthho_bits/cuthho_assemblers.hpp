@@ -1632,37 +1632,36 @@ public:
 
         size_t nb_cells =  msh.cells.size();
 
-        // Filling the structure cell offset 
+        auto celdeg = hdi.cell_degree();
+        auto facdeg = hdi.face_degree();
+        auto cbs   = cell_basis<Mesh,T>::size(celdeg);
+        auto fbs   = face_basis<Mesh,T>::size(facdeg);
+
+        // Filling the structure cell dofs 
         auto offset_ddl = 0;
         for(size_t i=0; i < nb_cells; i++) {
             auto& cl = msh.cells[i];
-            auto celdeg = hdi.cell_degree();
-            auto facdeg = hdi.face_degree();
-            auto cbs   = cell_basis<Mesh,T>::size(celdeg);
-            auto fbs   = face_basis<Mesh,T>::size(facdeg);
             auto num_faces = faces(msh, cl).size();
             auto dofs = 0;
+            // std::cout << std::endl;
             if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_NEGATIVE_SIDE) {
                 // std::cout << "UNCUT NEGATIVE CELL: " << offset(msh, cl) << std::endl;
-                cl.user_data.cell_offset_ddl = offset_ddl;
-                // std::cout << "Offset: " << offset_ddl << std::endl;       
                 // Adding the local cell and face unknowns 
                 dofs += cbs + num_faces*fbs;
-                // Loop over depcbs + num_faces*fbsendant cells 
+                // Loop over dependant cells 
                 // std::cout << "Dependant cells:   ";
                 for (auto &dp_cl : cl.user_data.dependent_cells_neg) {
                     // std::cout << dp_cl << "   ";
                     num_faces = faces(msh, msh.cells[dp_cl]).size();
-                    dofs += cbs + num_faces*fbs; 
+                    // Adding dofs of the dependent cell (bad cut part) as well as cell dofs of the 
+                    // healthy part for the computation of the jump
+                    dofs += cbs + num_faces*fbs + cbs; 
                 }
-                offset_ddl += dofs;
-                cl.user_data.dofs = dofs;
-                // std::cout << std::endl << std::endl;
+                cl.user_data.local_dofs = dofs;
+                // std::cout << std::endl;
             }
             else if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
-                // std::cout << "UNCUT POSITIVE CELL: " << offset(msh, cl) << std::endl;
-                cl.user_data.cell_offset_ddl = offset_ddl;
-                // std::cout << "Offset: " << offset_ddl << std::endl;       
+                // std::cout << "UNCUT POSITIVE CELL: " << offset(msh, cl) << std::endl;    
                 // Adding the local cell and face unknowns 
                 dofs += cbs + num_faces*fbs; 
                 // Loop over dependant cells 
@@ -1672,14 +1671,11 @@ public:
                     num_faces = faces(msh, msh.cells[dp_cl]).size();
                     dofs += cbs + num_faces*fbs; 
                 }
-                offset_ddl += dofs;
-                cl.user_data.dofs = dofs;
-                // std::cout << std::endl << std::endl;
+                cl.user_data.local_dofs = dofs;
+                // std::cout << std::endl;
             }
             else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
-                // std::cout << "TOK CELL: " << offset(msh, cl) << std::endl;
-                cl.user_data.cell_offset_ddl = offset_ddl;   
-                // std::cout << "Offset: " << offset_ddl << std::endl;      
+                // std::cout << "TOK CELL: " << offset(msh, cl) << std::endl;    
                 // Adding the local cell and face unknowns 
                 dofs += 2*(cbs + num_faces*fbs);                
                 // Loop over negative dependant cells 
@@ -1687,7 +1683,9 @@ public:
                 for (auto &dp_cl : cl.user_data.dependent_cells_neg) {
                     // std::cout << dp_cl << "   ";
                     num_faces = faces(msh, msh.cells[dp_cl]).size();
-                    dofs += cbs + num_faces*fbs; 
+                    // Adding dofs of the dependent cell (bad cut part) as well as cell dofs of the 
+                    // healthy part for the computation of the jump
+                    dofs += cbs + num_faces*fbs + cbs; 
                 }
                 // std::cout << std::endl;
                 // Loop over positive dependant cells 
@@ -1698,13 +1696,11 @@ public:
                     dofs += cbs + num_faces*fbs; 
                 }
                 offset_ddl += dofs;
-                cl.user_data.dofs = dofs;
-                // std::cout << std::endl << std::endl;
+                cl.user_data.local_dofs = dofs;
+                // std::cout << std::endl;
             }
             else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
                 // std::cout << "TKONEG CELL: " << offset(msh, cl) << std::endl;
-                cl.user_data.cell_offset_ddl = offset_ddl;   
-                // std::cout << "Offset: " << offset_ddl << std::endl;      
                 // Adding the local cell and face unknowns 
                 dofs += cbs + num_faces*fbs;                
                 // Loop over positive dependant cells 
@@ -1715,31 +1711,31 @@ public:
                     dofs += cbs + num_faces*fbs; 
                 }
                 offset_ddl += dofs;
-                cl.user_data.dofs = dofs;
-                // std::cout << std::endl << std::endl;
+                cl.user_data.local_dofs = dofs;
+                // std::cout << std::endl;
             }        
             else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-                // std::cout << "TKONEG CELL: " << offset(msh, cl) << std::endl;
-                cl.user_data.cell_offset_ddl = offset_ddl;   
-                // std::cout << "Offset: " << offset_ddl << std::endl;      
+                // std::cout << "TKOPOS CELL: " << offset(msh, cl) << std::endl;
                 // Adding the local cell and face unknowns 
                 dofs += cbs + num_faces*fbs;                
-                // Loop over positive dependant cells 
+                // Loop over negative dependant cells 
                 // std::cout << "Negative dependant cells:   ";
                 for (auto &dp_cl : cl.user_data.dependent_cells_neg) {
                     // std::cout << dp_cl << "   ";
                     num_faces = faces(msh, msh.cells[dp_cl]).size();
-                    dofs += cbs + num_faces*fbs; 
+                    // Adding dofs of the dependent cell (bad cut part) as well as cell dofs of the 
+                    // healthy part for the computation of the jump
+                    dofs += cbs + num_faces*fbs + cbs; 
                 }
-                offset_ddl += dofs;
-                cl.user_data.dofs = dofs;
-                // std::cout << std::endl << std::endl;
+                cl.user_data.local_dofs = dofs;
+                // std::cout << std::endl;
             }
-            // std::cout << "cell = " << offset(msh, cl) << std::endl;
-            // std::cout << "dofs = " << cl.user_data.dofs << std::endl << std::endl;
+            // std::cout << "local dofs = " << cl.user_data.local_dofs << std::endl << std::endl;
         }
         // Vérif n_dofs
         auto n_dofs = 0;
+        auto verif_dofs = 0;
+        auto cp_dp_neg = 0;
         for(size_t i=0; i < nb_cells; i++) {
             auto cl = msh.cells[i];
             auto celdeg = hdi.cell_degree();
@@ -1753,14 +1749,16 @@ public:
             else {
                 local_dofs = 2*(cbs+ fbs*4);
             }
-            n_dofs += local_dofs;
+            verif_dofs += local_dofs;
+            n_dofs += cl.user_data.local_dofs;
+            cp_dp_neg += cl.user_data.dependent_cells_neg.size();
         }
-        // std::cout << "n_dofs = " << n_dofs << std::endl;
-
-    
+        // std::cout << "verif_dofs = " << verif_dofs << std::endl;
+        // std::cout << "n_dofs = "     << n_dofs     << std::endl;
+        // std::cout << "minus cbs  = " << n_dofs-cp_dp_neg*cbs << std::endl;
         // std::cout << "COMPUTE_DOFS_DATA OK" << std::endl;
 
-        return offset_ddl;
+        return verif_dofs;
     }
 
 
@@ -1774,38 +1772,38 @@ public:
             auto facdeg = this->di.face_degree();
             auto cbs = cell_basis<Mesh,T>::size(celdeg);
             auto fbs = face_basis<Mesh,T>::size(facdeg);
-            auto offset_cl = cl.user_data.cell_offset_ddl;
-            auto dofs = cl.user_data.dofs;
+            auto offset_cl = offset(msh,cl);
+            auto dofs = cl.user_data.local_dofs;
             // std::cout << "cell = " << offset(msh, cl) << std::endl;
             // std::cout << "offset = " << offset_cl << std::endl;
             // std::cout << "dofs = " << dofs << std::endl << std::endl;
-            if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_NEGATIVE_SIDE) {    
-                Matrix<T, Dynamic, 1> x_proj_dof = project_function_uncut(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
-                x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
-                // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
-            }
-            else if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_POSITIVE_SIDE) {   
-                Matrix<T, Dynamic, 1> x_proj_dof = project_function_uncut(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
-                x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
-                // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
-            }
-            else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {     
-                Matrix<T, Dynamic, 1> x_proj_dof = project_function_TOK(msh, cl, hho_di, scal_fun);
-                x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
-                // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
-            }
-            else {
-                if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) { 
-                    Matrix<T, Dynamic, 1> x_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
-                    x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
-                    // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
-                }
-                else { 
-                    Matrix<T, Dynamic, 1> x_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
-                    x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
-                    // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
-                }
-            }
+            // if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_NEGATIVE_SIDE) {    
+            //     Matrix<T, Dynamic, 1> x_proj_dof = project_function_uncut(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
+            //     x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
+            //     // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
+            // }
+            // else if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_POSITIVE_SIDE) {   
+            //     Matrix<T, Dynamic, 1> x_proj_dof = project_function_uncut(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
+            //     x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
+            //     // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
+            // }
+            // else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {     
+            //     Matrix<T, Dynamic, 1> x_proj_dof = project_function_TOK(msh, cl, hho_di, scal_fun);
+            //     x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
+            //     // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
+            // }
+            // else {
+            //     if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) { 
+            //         Matrix<T, Dynamic, 1> x_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_POSITIVE_SIDE, scal_fun);
+            //         x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
+            //         // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
+            //     }
+            //     else { 
+            //         Matrix<T, Dynamic, 1> x_proj_dof = project_function_TKOibar(msh, cl, hho_di, element_location::IN_NEGATIVE_SIDE, scal_fun);
+            //         x_glob.block(offset_cl, 0, dofs, 1) = x_proj_dof.block(0, 0, dofs, 1);
+            //         // std::cout << x_glob.block(offset_cl, 0, dofs, 1) << std::endl << std::endl;
+            //     }
+            // }
         }
 
         // std::cout << std::endl << "System size = " << x_glob.size() << std::endl;

@@ -810,7 +810,7 @@ make_hho_stabilization_interface_TOK(const cuthho_mesh<T, ET>& msh,
     auto num_faces = fcs.size();
     auto local_dofs = cbs + num_faces*fbs;
     auto nb_dp_cells_neg = cl.user_data.dependent_cells_neg.size();
-    auto total_dofs = cl.user_data.dofs;
+    auto total_dofs = cl.user_data.local_dofs;
 
     Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(total_dofs, total_dofs);
 
@@ -889,7 +889,7 @@ make_hho_stabilization_interface_TKO_NEG(const cuthho_mesh<T, ET>& msh,
     // std::cout << "   Stabilisation size : " << data.size() << std::endl << std::endl;
 
     // To remove after checking Gradient reconstruction
-    data = Matrix<T, Dynamic, Dynamic>::Zero(cl.user_data.dofs, cl.user_data.dofs);
+    data = Matrix<T, Dynamic, Dynamic>::Zero(cl.user_data.local_dofs, cl.user_data.local_dofs);
     return data;
 
 }
@@ -932,7 +932,7 @@ make_hho_stabilization_interface_TKO_POS(const cuthho_mesh<T, ET>& msh,
     // data.block(2*cbs, 2*cbs, num_faces*fbs, num_faces*fbs) += parms.kappa_1 * stab_n.block(cbs, cbs, num_faces*fbs, num_faces*fbs);
 
     // To remove after checking Gradient reconstruction
-    data = Matrix<T, Dynamic, Dynamic>::Zero(cl.user_data.dofs, cl.user_data.dofs);
+    data = Matrix<T, Dynamic, Dynamic>::Zero(cl.user_data.local_dofs, cl.user_data.local_dofs);
     return data;
 }
 
@@ -1333,7 +1333,7 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
     auto ns = normals(msh, cl);
     auto num_faces = fcs.size();
     auto local_dofs = cbs + num_faces*fbs;
-    auto total_dofs = cl.user_data.dofs;
+    auto total_dofs = cl.user_data.local_dofs;
 
     matrix_type rhs_tmp = matrix_type::Zero(gbs, local_dofs);
     matrix_type gr_lhs  = matrix_type::Zero(gbs, gbs);
@@ -1460,7 +1460,7 @@ make_hho_gradrec_vector_interface_TKOi(const cuthho_mesh<T, ET>& msh,
 
     const auto graddeg = di.grad_degree();
     auto gbs = vector_cell_basis<cuthho_mesh<T, ET>,T>::size(graddeg);
-    auto ndofs = cl.user_data.dofs;
+    auto ndofs = cl.user_data.local_dofs;
     
     matrix_type oper = matrix_type::Zero(gbs, ndofs);
     matrix_type data = matrix_type::Zero(ndofs, ndofs);
@@ -1563,7 +1563,7 @@ make_hho_gradrec_vector_interface_TKOibar(const cuthho_mesh<T, ET>& msh,
     auto ns = normals(msh, cl);
     auto num_faces = fcs.size();
     auto local_dofs = cbs + num_faces*fbs;
-    auto total_dofs = cl.user_data.dofs;
+    auto total_dofs = cl.user_data.local_dofs;
 
     matrix_type rhs_tmp = matrix_type::Zero(gbs, local_dofs);
     matrix_type gr_lhs  = matrix_type::Zero(gbs, gbs);

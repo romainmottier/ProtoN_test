@@ -59,8 +59,7 @@ struct cell_cuthho_info
     size_t paired_cells; // DEPENDANT POSITIVE CELLS (POINT THE CURRENT CELL)
     std::set<size_t> dependent_cells_neg; // DEPENDANT POSITIVE CELLS (POINT THE CURRENT CELL)
     std::set<size_t> dependent_cells_pos; // DEPENDANT NEGATIVE CELLS (POINT THE CURRENT CELL)
-    size_t cell_offset_ddl;  
-    size_t dofs;
+    size_t local_dofs;
 
     bool                        highlight; // for tests
     cell_cuthho_info() :

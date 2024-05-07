@@ -71,11 +71,11 @@ public:
         stab.block(cbs, cbs, cbs, cbs) += penalty_scale * penalty;
 
         // STAB + RECONSTRUCTION     
-        std::cout << "DIMENSION STAB: " << stab.size() << std::endl;
-        std::cout << "DIMENSION GRADREC NEG: " << gr_n.second.size() << std::endl;
-        std::cout << "DIMENSION GRADREC POS: " << gr_p.second.size() << std::endl;
+        // std::cout << "DIMENSION STAB: " << stab.size() << std::endl;
+        // std::cout << "DIMENSION GRADREC NEG: " << gr_n.second.size() << std::endl;
+        // std::cout << "DIMENSION GRADREC POS: " << gr_p.second.size() << std::endl;
         Mat lc = stab_parms.kappa_1*gr_n.second + stab_parms.kappa_2*gr_p.second + stab;
-        std::cout << "TEST 2 " << std::endl; 
+        // std::cout << "TEST 2 " << std::endl; 
         
 //         ///////////////    RHS
         Vect f = Vect::Zero(lc.rows());
@@ -103,7 +103,7 @@ public:
         }
         // std::cout << "TEST 6" << std::endl;
         f -= F_bis.transpose() * (parms.kappa_1 * gr_n.first );
-std::cout << "TEST 7" << std::endl;
+// std::cout << "TEST 7" << std::endl;
         return std::make_pair(lc, f);
     }
 

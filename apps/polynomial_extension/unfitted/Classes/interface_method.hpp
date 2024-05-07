@@ -28,11 +28,13 @@ public:
     make_contrib(const Mesh& msh, const typename Mesh::cell_type& cl,
                  const testType &test_case, const hho_degree_info hdi) {
 
-        if (location(msh, cl) != element_location::ON_INTERFACE)
+        if (location(msh, cl) != element_location::ON_INTERFACE) {
             return make_contrib_uncut(msh, cl, hdi, test_case);
+        }
 
-        else // on interface
+        else { // on interface
             return make_contrib_cut(msh, cl, test_case, hdi);
+        }
     }
 
     std::pair<Mat, Vect>

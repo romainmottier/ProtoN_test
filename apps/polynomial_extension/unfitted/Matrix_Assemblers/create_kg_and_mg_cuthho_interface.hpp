@@ -36,7 +36,7 @@ create_kg_and_mg_cuthho_interface(const Mesh& msh, hho_degree_info & hdi, meth &
       size_t n_dof = assembler.n_dof(msh,cell);
       Matrix<RealType, Dynamic, Dynamic> mass = Matrix<RealType, Dynamic, Dynamic>::Zero(n_dof,n_dof);
       mass.block(0,0,cell_mass.rows(),cell_mass.cols()) = cell_mass;
-      assembler.assemble_ex(msh, cell, lc, f);
+      assembler.assemble(msh, cell, lc, f);
       assembler.assemble_mass(msh, cell, mass);
     }
     assembler.finalize();
@@ -72,15 +72,19 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
     size_t system_size = assembler.compute_dofs_data(msh, hdi);
     auto dofs_proj = assembler.make_projection_operator(msh, hdi, system_size, sol_fun);
     for (auto& cell : msh.cells) {
-
       ////////// DEBUG
       auto offset_cl = offset(msh, cell);
       std::cout << "Cell: " << offset_cl << std::endl;
       //////////
-      
       auto contrib = method.make_contrib(msh, cell, test_case, hdi);
       auto lc = contrib.first;
       auto f = contrib.second;
+      auto cell_mass = method.make_contrib_mass(msh, cell, test_case, hdi);
+      size_t n_dof = assembler.n_dof(msh,cell);
+      Matrix<RealType, Dynamic, Dynamic> mass = Matrix<RealType, Dynamic, Dynamic>::Zero(n_dof,n_dof);
+      mass.block(0,0,cell_mass.rows(),cell_mass.cols()) = cell_mass;
+      assembler.assemble(msh, cell, lc, f);
+      // assembler.assemble_mass(msh, cell, mass);
     }
 
     

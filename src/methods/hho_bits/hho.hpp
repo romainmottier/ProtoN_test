@@ -280,14 +280,17 @@ make_hho_naive_stabilization_extended(const Mesh& msh, const typename Mesh::cell
     // Loop over dependent cells 
     size_t offset_dofs = local_dofs; // cpt 
     size_t local_dofs_ex; 
+    element_location where;
     for (auto& dp_cl : dp_cells) {
         auto dp_cell = msh.cells[dp_cl];
         fcs = faces(msh, dp_cell);
         if (dp_cell.user_data.location == element_location::IN_NEGATIVE_SIDE) {
             local_dofs_ex = local_dofs + cbs;
+            where = element_location::IN_NEGATIVE_SIDE;
         }
         else {
             local_dofs_ex = local_dofs;
+            where = element_location::IN_POSITIVE_SIDE;
         }
         for (size_t i = 0; i < fcs.size(); i++) {
             auto fc = fcs[i];
@@ -295,7 +298,7 @@ make_hho_naive_stabilization_extended(const Mesh& msh, const typename Mesh::cell
             Matrix<T, Dynamic, Dynamic> oper = Matrix<T, Dynamic, Dynamic>::Zero(fbs, n_dofs);
             Matrix<T, Dynamic, Dynamic> mass = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
             Matrix<T, Dynamic, Dynamic> trace = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs);
-            oper.block(0, offset_dofs+cbs+i*fbs, fbs, fbs) = -If; // extended faces terms
+            oper.block(0, offset_dofs+cbs+i*fbs, fbs, fbs) = -If; // Extended faces unknowns
             // Projection of cell terms on the faces 
             auto qps = integrate(msh, fc, 2*facdeg + 1);
             for (auto& qp : qps) {
@@ -304,7 +307,7 @@ make_hho_naive_stabilization_extended(const Mesh& msh, const typename Mesh::cell
                 mass  += qp.second * f_phi * f_phi.transpose();
                 trace += qp.second * f_phi * c_phi.transpose();
             }
-            oper.block(0, 0, fbs, cbs) = mass.llt().solve(trace); // Trace of the basis function of the current cell 
+            oper.block(0, 0, fbs, cbs) = mass.llt().solve(trace); // Trace of the cell unknowns of the current cell 
             if (scaled_Q) {
                 data += oper.transpose() * mass * oper * (1.0/h);
             }
@@ -531,10 +534,9 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
         }
     }
 
-
     // Loop over dependent cells 
     size_t offset_dofs = local_dofs; // cpt 
-    size_t local_dofs_ex; 
+    size_t local_dofs_ex;
     for (auto& dp_cl : dp_cells) {
         auto dp_cell = msh.cells[dp_cl];
         // Interface term of the extended cells
@@ -556,15 +558,16 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
         else {
             local_dofs_ex = local_dofs;
         }
-        // Extended cell term
+        // cell term
         if(celdeg > 0) {
             const auto qps = integrate(msh, dp_cell, celdeg-1 + facdeg);
             for (auto& qp : qps) {
                 const auto c_dphi = cb.eval_gradients(qp.first);
                 const auto g_phi  = gb.eval_basis(qp.first);
-                gr_rhs.block(0, offset_dofs, gbs, cbs) += qp.second * g_phi * c_dphi.transpose(); 
+                gr_rhs.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose(); // Current cell terms
             }
         }
+
         // face term
         fcs = faces(msh, dp_cell);
         ns  = normals(msh, dp_cell);
@@ -579,13 +582,13 @@ make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type
                 const vector_type f_phi      = fb.eval_basis(qp.first);
                 const auto        g_phi      = gb.eval_basis(qp.first);
                 const vector_type qp_g_phi_n = qp.second * g_phi * n;
-                gr_rhs.block(0, offset_dofs + cbs + i*fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose(); // Extended cell terms
+                gr_rhs.block(0, offset_dofs + cbs + i*fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose(); // Extended face terms
                 gr_rhs.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose(); // Current cell terms
             }
         }
         offset_dofs += local_dofs_ex;
     } 
-
+    
     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
 

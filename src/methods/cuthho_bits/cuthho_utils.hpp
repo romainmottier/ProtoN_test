@@ -923,7 +923,7 @@ make_hho_gradrec_vector_extended(const cuthho_mesh<T, ET>& msh, const typename c
             const auto c_dphi = cb.eval_gradients(qp.first);
             const auto g_phi  = gb.eval_basis(qp.first);
             gr_lhs.block(0, 0, gbs, gbs) += qp.second * g_phi * g_phi.transpose();  // Mass matrix
-            gr_rhs.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose(); // Cell term
+            gr_rhs.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose(); // Current cell unknown
         }
     }
 
@@ -957,8 +957,8 @@ make_hho_gradrec_vector_extended(const cuthho_mesh<T, ET>& msh, const typename c
     matrix_type rhs_tmp;
     for (auto& dp_cl : dp_cells) {
 
-        rhs_tmp = matrix_type::Zero(gbs, num_faces*fbs);
         auto dp_cell = msh.cells[dp_cl];
+        rhs_tmp = matrix_type::Zero(gbs, num_faces*fbs);      
 
         // CELL TERM USING THE CELL DOFS OF THE CURRENT CELL
         if(celdeg > 0) {
@@ -989,7 +989,7 @@ make_hho_gradrec_vector_extended(const cuthho_mesh<T, ET>& msh, const typename c
             }
         }
 
-        // Interface term of the extended cells
+        // INTERFACE TERMS OF THE EXTENDED CELLS
         if (where == element_location::IN_NEGATIVE_SIDE) {
             matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
             const auto iqps = integrate_interface(msh, dp_cell, celdeg+graddeg, element_location::IN_NEGATIVE_SIDE);
@@ -1041,9 +1041,8 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
     const auto facdeg  = di.face_degree();
     const auto graddeg = di.grad_degree();
 
-    cell_basis<cuthho_mesh<T, ET>,T>            cb(msh, cl, celdeg);
-    vector_cell_basis<cuthho_mesh<T, ET>,T>     gb(msh, cl, graddeg);
-
+    cell_basis<cuthho_mesh<T, ET>,T>        cb(msh, cl, celdeg);
+    vector_cell_basis<cuthho_mesh<T, ET>,T> gb(msh, cl, graddeg);
     auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
     auto gbs = vector_cell_basis<cuthho_mesh<T, ET>,T>::size(graddeg);
@@ -1058,16 +1057,18 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
     matrix_type gr_lhs  = matrix_type::Zero(gbs, gbs);
     matrix_type gr_rhs  = matrix_type::Zero(gbs, total_dofs);
 
-    ////////////////////////////////////////////////// CURRENT CELL 
-    // Cell terms
-    auto qps = integrate(msh, cl, celdeg-1 + facdeg, where);
-    for (auto& qp : qps) {
-        const auto c_dphi = cb.eval_gradients(qp.first);
-        const auto g_phi  = gb.eval_basis(qp.first);
-        gr_lhs.block(0, 0, gbs, gbs)  += qp.second*g_phi*g_phi.transpose();
-        rhs_tmp.block(0, 0, gbs, cbs) += qp.second*g_phi*c_dphi.transpose();
+    // CELL TERMS
+    if (celdeg > 0) {
+        const auto qps = integrate(msh, cl, celdeg-1 + facdeg, where);
+        for (auto& qp : qps) {
+            const auto c_dphi = cb.eval_gradients(qp.first);
+            const auto g_phi  = gb.eval_basis(qp.first);
+            gr_lhs.block(0, 0, gbs, gbs)  += qp.second*g_phi*g_phi.transpose();  // Mass matrix
+            rhs_tmp.block(0, 0, gbs, cbs) += qp.second*g_phi*c_dphi.transpose(); // Current cell unknown of a given side
+        }
     }
-    // Face terms
+
+    // FACE TERMS
     for (size_t i = 0; i < fcs.size(); i++) {
         const auto fc = fcs[i];
         const auto n  = ns[i];
@@ -1082,12 +1083,18 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
             rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n*c_phi.transpose();
         }
     }
-    if (where == element_location::IN_NEGATIVE_SIDE)
-        gr_rhs.block(0, 0, gbs, local_dofs) += rhs_tmp.block(0, 0, gbs, local_dofs);
-    if (where == element_location::IN_POSITIVE_SIDE) 
-        gr_rhs.block(0, local_dofs, gbs, local_dofs) += rhs_tmp.block(0, 0, gbs, local_dofs);
 
-    ////////////////////////////////////////////////// INTERFACE TERM CURRENT CELL
+    // ADDING CONTRIBUTIONS OF DOFS OF THE CURRENT CELL
+    if (where == element_location::IN_NEGATIVE_SIDE) {
+        gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
+        gr_rhs.block(0, 2*cbs, gbs, num_faces*fbs) += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
+    }
+    if (where == element_location::IN_POSITIVE_SIDE) {
+        gr_rhs.block(0, cbs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
+        gr_rhs.block(0, 2*cbs + num_faces*fbs, gbs, num_faces*fbs) += rhs_tmp.block(0, cbs, gbs, num_faces*fbs);
+    }
+
+    // INTERFACE TERM CURRENT CELL
     if (where == element_location::IN_NEGATIVE_SIDE) {
         matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
         const auto iqps = integrate_interface(msh, cl, celdeg+graddeg, element_location::IN_NEGATIVE_SIDE);
@@ -1099,30 +1106,53 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
             interface_term.block(0 , 0, gbs, cbs)   -= qp_g_phi_n*c_phi.transpose();
             interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n*c_phi.transpose();
         }
-        gr_rhs.block(0, 0, gbs, cbs) += interface_term.block(0, 0, gbs, cbs);            // neg terms
-        gr_rhs.block(0, local_dofs, gbs, cbs) += interface_term.block(0, cbs, gbs, cbs); // pos terms
+        gr_rhs.block(0, 0, gbs, cbs)   += interface_term.block(0, 0, gbs, cbs);   // NEG CELL DOFS
+        gr_rhs.block(0, cbs, gbs, cbs) += interface_term.block(0, cbs, gbs, cbs); // POS CELL DOFS
     }
 
-    ////////////////////////////////////////////////// DEPENDENT CELLS 
+    // ELEMENT LOCATION OF THE UNCUT CELL AND ITS DEPENDENT CELLS
     auto dp_cells = cl.user_data.dependent_cells_neg;
-    size_t local_dofs_ex = local_dofs; 
-    if (where == element_location::IN_POSITIVE_SIDE) {
+    if (where == element_location::IN_POSITIVE_SIDE)
         dp_cells = cl.user_data.dependent_cells_pos;
-    }
-    else {
-        local_dofs_ex += cbs;
-    }
-    size_t extended_dofs = dp_cells.size()*local_dofs_ex;
-    rhs_tmp = matrix_type::Zero(gbs, extended_dofs);
-    // std::cout << "LOCAL DOFS = " << 2*local_dofs << std::endl;
-    // std::cout << "EXTENDED DOFS = " << extended_dofs << std::endl;
+    auto nb_dp_cells = dp_cells.size();
 
-    // Loop over dependent cells 
-    size_t offset_dofs = 2*local_dofs; // cpt 
+    // LOOP OVER DEPENDENT CELLS  
+    size_t offset_dofs_extended = 2*local_dofs; 
     for (auto &dp_cl : dp_cells) {
+
         auto dp_cell = msh.cells[dp_cl];
-        
-        // Interface term of the extended cells
+        rhs_tmp = matrix_type::Zero(gbs, local_dofs);  
+
+        // CELL TERM USING THE CELL DOFS OF THE CURRENT CELL
+        if(celdeg > 0) {
+            auto qps = integrate(msh, dp_cell, celdeg-1 + facdeg, where);
+            for (auto& qp : qps) {
+                const auto c_dphi = cb.eval_gradients(qp.first);
+                const auto g_phi  = gb.eval_basis(qp.first);
+                rhs_tmp.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose(); // CURRENT CELL UNKNOWNS
+            }
+        }
+
+        // FACE TERM USING THE CURRENT CELL DOFS AND THE EXTENDED FACE DOFS
+        fcs = faces(msh, dp_cell);
+        ns  = normals(msh, dp_cell);
+        num_faces = fcs.size();
+        for (size_t i=0; i < num_faces; i++) {
+            const auto fc = fcs[i];
+            const auto n  = ns[i];
+            cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg, where);
+            const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg));
+            for (auto& qp : qps_f) {
+                const vector_type c_phi       = cb.eval_basis(qp.first);
+                const vector_type f_phi       = fb.eval_basis(qp.first);
+                const auto        g_phi       = gb.eval_basis(qp.first);
+                const vector_type qp_g_phi_n  = qp.second * g_phi * n;
+                rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();           // CURRENT CELL UNKNOWNS
+                rhs_tmp.block(0, cbs + i*fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose(); // EXTENDED FACE UNKNOWNS
+            }
+        }
+
+        // INTERFACE TERMS OF THE EXTENDED CELLS
         if (dp_cell.user_data.location == element_location::IN_NEGATIVE_SIDE) {
             matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
             const auto iqps = integrate_interface(msh, dp_cell, celdeg+graddeg, element_location::IN_NEGATIVE_SIDE);
@@ -1134,52 +1164,23 @@ make_hho_gradrec_vector_interface_TOK(const cuthho_mesh<T, ET>& msh,
                 interface_term.block(0 , 0, gbs, cbs)   -= qp_g_phi_n*c_phi.transpose();
                 interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n*c_phi.transpose();
             }
-            // neg terms of the current cell
-            gr_rhs.block(0, 0, gbs, cbs) += interface_term.block(0, 0, gbs, cbs);        
-            // pos terms the extended term                  
-            gr_rhs.block(0, offset_dofs + local_dofs, gbs, cbs) += interface_term.block(0, cbs, gbs, cbs); 
+            gr_rhs.block(0, 0, gbs, cbs) += interface_term.block(0, 0, gbs, cbs);                            // NEG CELL UNKNOWNS OF THE CURRENT CELL
+            gr_rhs.block(0, offset_dofs_extended + cbs, gbs, cbs) += interface_term.block(0, cbs, gbs, cbs); // POS CELL UNKNOWNS OF THE EXTENDED CELL
         }
-    // std::cout << "INTERFACE TERM OK" << std::endl;
 
-        // Extended cell term
-        auto qps = integrate(msh, dp_cell, celdeg-1 + facdeg, where);
-        for (auto& qp : qps) {
-            const auto c_dphi = cb.eval_gradients(qp.first);
-            const auto g_phi  = gb.eval_basis(qp.first);
-            // Current cell terms
-            rhs_tmp.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose(); 
+        // ADDING EXTENDED DOFS CONTRIBUTIONS 
+        if (where == element_location::IN_NEGATIVE_SIDE) {
+            gr_rhs.block(0, 0, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
+            gr_rhs.block(0, offset_dofs_extended + 2*cbs, gbs, num_faces*fbs) += rhs_tmp.block(0, 0, gbs, num_faces*fbs);
         }
-        
-    // std::cout << "EXTENDED CELL OK" << std::endl;
-        // Extended face term
-        fcs = faces(msh, dp_cell);
-        ns  = normals(msh, dp_cell);
-        num_faces = fcs.size();
-        for (size_t i=0; i < num_faces; i++) {
-            const auto fc = fcs[i];
-            const auto n  = ns[i];
-            cut_face_basis<cuthho_mesh<T, ET>,T> fb(msh, fc, facdeg, where);
-            const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg));
-            for (auto& qp : qps_f) {
-                const vector_type c_phi      = cb.eval_basis(qp.first);
-                const vector_type f_phi      = fb.eval_basis(qp.first);
-                const auto        g_phi      = gb.eval_basis(qp.first);
-                const vector_type qp_g_phi_n = qp.second * g_phi * n;
-                // Extended face terms
-                rhs_tmp.block(0, offset_dofs-2*local_dofs + cbs + i*fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose(); 
-                // Current cell terms
-                rhs_tmp.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();                         
-            }
+        if (where == element_location::IN_POSITIVE_SIDE) {
+            gr_rhs.block(0, cbs, gbs, cbs) += rhs_tmp.block(0, 0, gbs, cbs);
+            gr_rhs.block(0, offset_dofs_extended + 2*cbs + num_faces*fbs, gbs, num_faces*fbs) += rhs_tmp.block(0, 0, gbs, num_faces*fbs);
         }
-        offset_dofs += local_dofs_ex;
-    }
-    // std::cout << "EXTENDED FACE OK" << std::endl;
-    if (where == element_location::IN_NEGATIVE_SIDE) {
-        gr_rhs.block(0, 2*local_dofs, gbs, extended_dofs) += rhs_tmp.block(0, 0, gbs, extended_dofs);
-    }
-    if (where == element_location::IN_POSITIVE_SIDE) {
-        auto nb_dp_cell_neg = cl.user_data.dependent_cells_neg.size();
-        gr_rhs.block(0, 2*local_dofs+nb_dp_cell_neg*(local_dofs+cbs), gbs, extended_dofs) += rhs_tmp.block(0, 0, gbs, extended_dofs);
+
+        // UPDATING THE OFFSET OF DOFS OF THE EXTENDED CELLS
+        offset_dofs_extended += 2*local_dofs;
+
     }
 
     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);

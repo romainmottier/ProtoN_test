@@ -1279,6 +1279,7 @@ public:
         auto loc = location(msh,fc);
         if( loc != where && loc != element_location::ON_INTERFACE)
         {
+            // std::cout << "blabla" << std::endl;
             face_bar        = barycenter(msh, fc);
             face_h          = diameter(msh, fc);
             basis_degree    = degree;
@@ -1287,8 +1288,20 @@ public:
             auto pts = points(msh, fc);
             base = face_bar - pts[0];
         }
+        // else if ( loc == where && loc != element_location::ON_INTERFACE)
+        // {
+        //     std::cout << "UNCUT FACES" << std::endl;
+        //     face_bar        = barycenter(msh, fc);
+        //     face_h          = diameter(msh, fc);
+        //     basis_degree    = degree;
+        //     basis_size      = degree+1;
+
+        //     auto pts = points(msh, fc);
+        //     base = face_bar - pts[0];
+        // }
         else
         {
+            // std::cout << "CUT FACES" << std::endl;
             face_bar        = barycenter(msh, fc, where);
             face_h          = diameter(msh, fc, where);
             basis_degree    = degree;

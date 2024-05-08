@@ -277,7 +277,7 @@ make_hho_naive_stabilization_extended(const Mesh& msh, const typename Mesh::cell
         }
     }
 
-    // Loop over dependent cells 
+    // Loop over dependent  
     size_t offset_dofs = local_dofs; // cpt 
     size_t local_dofs_ex; 
     element_location where;
@@ -472,128 +472,128 @@ make_hho_gradrec_vector(const Mesh& msh, const typename Mesh::cell_type& cl, con
 }
 
 
-template<typename Mesh, typename Function>
-std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-             Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
-make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di, const Function& level_set_function) {
+// template<typename Mesh, typename Function>
+// std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
+//              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
+// make_hho_gradrec_vector_extended(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di, const Function& level_set_function) {
 
-    using T = typename Mesh::coordinate_type;
-    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, Dynamic, 1>       vector_type;
+//     using T = typename Mesh::coordinate_type;
+//     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+//     typedef Matrix<T, Dynamic, 1>       vector_type;
     
-    const auto celdeg  = di.cell_degree();
-    const auto facdeg  = di.face_degree();
-    const auto graddeg = di.grad_degree();
+//     const auto celdeg  = di.cell_degree();
+//     const auto facdeg  = di.face_degree();
+//     const auto graddeg = di.grad_degree();
 
-    cell_basis<Mesh,T>        cb(msh, cl, celdeg);
-    vector_cell_basis<Mesh,T> gb(msh, cl, graddeg);
+//     cell_basis<Mesh,T>        cb(msh, cl, celdeg);
+//     vector_cell_basis<Mesh,T> gb(msh, cl, graddeg);
 
-    auto cbs = cell_basis<Mesh,T>::size(celdeg);
-    auto fbs = face_basis<Mesh,T>::size(facdeg);
-    auto gbs = vector_cell_basis<Mesh,T>::size(graddeg);
+//     auto cbs = cell_basis<Mesh,T>::size(celdeg);
+//     auto fbs = face_basis<Mesh,T>::size(facdeg);
+//     auto gbs = vector_cell_basis<Mesh,T>::size(graddeg);
 
-    auto fcs = faces(msh, cl);
-    auto ns = normals(msh, cl);
-    auto num_faces = fcs.size();
-    auto local_dofs = cbs + num_faces*fbs; 
-    auto total_dofs = cl.user_data.local_dofs;
+//     auto fcs = faces(msh, cl);
+//     auto ns = normals(msh, cl);
+//     auto num_faces = fcs.size();
+//     auto local_dofs = cbs + num_faces*fbs; 
+//     auto total_dofs = cl.user_data.local_dofs;
 
-    auto dp_cells = cl.user_data.dependent_cells_neg;
-    if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
-        dp_cells = cl.user_data.dependent_cells_pos;
-    }
-    auto nb_dp_cells = dp_cells.size();
+//     auto dp_cells = cl.user_data.dependent_cells_neg;
+//     if (cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
+//         dp_cells = cl.user_data.dependent_cells_pos;
+//     }
+//     auto nb_dp_cells = dp_cells.size();
 
-    matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
-    matrix_type gr_rhs = matrix_type::Zero(gbs, total_dofs);
+//     matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
+//     matrix_type gr_rhs = matrix_type::Zero(gbs, total_dofs);
 
-    // Cell terms 
-    if(celdeg > 0) {
-        const auto qps = integrate(msh, cl, celdeg-1 + facdeg);
-        for (auto& qp : qps) {
-            const auto c_dphi = cb.eval_gradients(qp.first);
-            const auto g_phi  = gb.eval_basis(qp.first);
-            gr_lhs.block(0, 0, gbs, gbs) += qp.second * g_phi * g_phi.transpose();  // Mass matrix
-            gr_rhs.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose(); // Cell term
-        }
-    }
+//     // Cell terms 
+//     if(celdeg > 0) {
+//         const auto qps = integrate(msh, cl, celdeg-1 + facdeg);
+//         for (auto& qp : qps) {
+//             const auto c_dphi = cb.eval_gradients(qp.first);
+//             const auto g_phi  = gb.eval_basis(qp.first);
+//             gr_lhs.block(0, 0, gbs, gbs) += qp.second * g_phi * g_phi.transpose();  // Mass matrix
+//             gr_rhs.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose(); // Cell term
+//         }
+//     }
 
-    // Face term
-    for (size_t i=0; i < num_faces; i++) {
-        const auto fc = fcs[i];
-        const auto n  = ns[i];
-        face_basis<Mesh,T> fb(msh, fc, facdeg);
-        const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg));
-        for (auto& qp : qps_f) {
-            const vector_type c_phi      = cb.eval_basis(qp.first);
-            const vector_type f_phi      = fb.eval_basis(qp.first);
-            const auto        g_phi      = gb.eval_basis(qp.first);
-            const vector_type qp_g_phi_n = qp.second * g_phi * n;
-            gr_rhs.block(0, cbs + i*fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
-            gr_rhs.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
-        }
-    }
+//     // Face term
+//     for (size_t i=0; i < num_faces; i++) {
+//         const auto fc = fcs[i];
+//         const auto n  = ns[i];
+//         face_basis<Mesh,T> fb(msh, fc, facdeg);
+//         const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg));
+//         for (auto& qp : qps_f) {
+//             const vector_type c_phi      = cb.eval_basis(qp.first);
+//             const vector_type f_phi      = fb.eval_basis(qp.first);
+//             const auto        g_phi      = gb.eval_basis(qp.first);
+//             const vector_type qp_g_phi_n = qp.second * g_phi * n;
+//             gr_rhs.block(0, cbs + i*fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
+//             gr_rhs.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
+//         }
+//     }
 
-    // Loop over dependent cells 
-    size_t offset_dofs = local_dofs; // cpt 
-    size_t local_dofs_ex;
-    for (auto& dp_cl : dp_cells) {
-        auto dp_cell = msh.cells[dp_cl];
-        // Interface term of the extended cells
-        if (dp_cell.user_data.location == element_location::IN_NEGATIVE_SIDE) {
-            local_dofs_ex = local_dofs + cbs;
-            matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
-            const auto iqps = integrate_interface(msh, dp_cell, celdeg+graddeg, element_location::IN_NEGATIVE_SIDE);
-            for (auto& qp : iqps) {
-                const auto c_phi = cb.eval_basis(qp.first);
-                const auto g_phi = gb.eval_basis(qp.first);
-                Matrix<T,2,1> n = level_set_function.normal(qp.first);
-                const vector_type qp_g_phi_n = qp.second*g_phi*n;
-                interface_term.block(0 , 0, gbs, cbs)   -= qp_g_phi_n*c_phi.transpose();
-                interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n*c_phi.transpose();
-            }
-            gr_rhs.block(0, 0, gbs, cbs) += interface_term.block(0, 0, gbs, cbs);                          // neg terms of the current cell
-            gr_rhs.block(0, offset_dofs + local_dofs, gbs, cbs) += interface_term.block(0, cbs, gbs, cbs); // pos terms the extended term
-        }
-        else {
-            local_dofs_ex = local_dofs;
-        }
-        // cell term
-        if(celdeg > 0) {
-            const auto qps = integrate(msh, dp_cell, celdeg-1 + facdeg);
-            for (auto& qp : qps) {
-                const auto c_dphi = cb.eval_gradients(qp.first);
-                const auto g_phi  = gb.eval_basis(qp.first);
-                gr_rhs.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose(); // Current cell terms
-            }
-        }
+//     // Loop over dependent cells 
+//     size_t offset_dofs = local_dofs; // cpt 
+//     size_t local_dofs_ex;
+//     for (auto& dp_cl : dp_cells) {
+//         auto dp_cell = msh.cells[dp_cl];
+//         // Interface term of the extended cells
+//         if (dp_cell.user_data.location == element_location::IN_NEGATIVE_SIDE) {
+//             local_dofs_ex = local_dofs + cbs;
+//             matrix_type interface_term = matrix_type::Zero(gbs, 2*cbs);
+//             const auto iqps = integrate_interface(msh, dp_cell, celdeg+graddeg, element_location::IN_NEGATIVE_SIDE);
+//             for (auto& qp : iqps) {
+//                 const auto c_phi = cb.eval_basis(qp.first);
+//                 const auto g_phi = gb.eval_basis(qp.first);
+//                 Matrix<T,2,1> n = level_set_function.normal(qp.first);
+//                 const vector_type qp_g_phi_n = qp.second*g_phi*n;
+//                 interface_term.block(0 , 0, gbs, cbs)   -= qp_g_phi_n*c_phi.transpose();
+//                 interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n*c_phi.transpose();
+//             }
+//             gr_rhs.block(0, 0, gbs, cbs) += interface_term.block(0, 0, gbs, cbs);                          // neg terms of the current cell
+//             gr_rhs.block(0, offset_dofs + local_dofs, gbs, cbs) += interface_term.block(0, cbs, gbs, cbs); // pos terms the extended term
+//         }
+//         else {
+//             local_dofs_ex = local_dofs;
+//         }
+//         // cell term
+//         if(celdeg > 0) {
+//             const auto qps = integrate(msh, dp_cell, celdeg-1 + facdeg);
+//             for (auto& qp : qps) {
+//                 const auto c_dphi = cb.eval_gradients(qp.first);
+//                 const auto g_phi  = gb.eval_basis(qp.first);
+//                 gr_rhs.block(0, 0, gbs, cbs) += qp.second * g_phi * c_dphi.transpose(); // Current cell terms
+//             }
+//         }
 
-        // face term
-        fcs = faces(msh, dp_cell);
-        ns  = normals(msh, dp_cell);
-        num_faces = fcs.size();
-        for (size_t i=0; i < num_faces; i++) {
-            const auto fc = fcs[i];
-            const auto n  = ns[i];
-            face_basis<Mesh,T> fb(msh, fc, facdeg);
-            const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg));
-            for (auto& qp : qps_f) {
-                const vector_type c_phi      = cb.eval_basis(qp.first);
-                const vector_type f_phi      = fb.eval_basis(qp.first);
-                const auto        g_phi      = gb.eval_basis(qp.first);
-                const vector_type qp_g_phi_n = qp.second * g_phi * n;
-                gr_rhs.block(0, offset_dofs + cbs + i*fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose(); // Extended face terms
-                gr_rhs.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose(); // Current cell terms
-            }
-        }
-        offset_dofs += local_dofs_ex;
-    } 
+//         // face term
+//         fcs = faces(msh, dp_cell);
+//         ns  = normals(msh, dp_cell);
+//         num_faces = fcs.size();
+//         for (size_t i=0; i < num_faces; i++) {
+//             const auto fc = fcs[i];
+//             const auto n  = ns[i];
+//             face_basis<Mesh,T> fb(msh, fc, facdeg);
+//             const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg));
+//             for (auto& qp : qps_f) {
+//                 const vector_type c_phi      = cb.eval_basis(qp.first);
+//                 const vector_type f_phi      = fb.eval_basis(qp.first);
+//                 const auto        g_phi      = gb.eval_basis(qp.first);
+//                 const vector_type qp_g_phi_n = qp.second * g_phi * n;
+//                 gr_rhs.block(0, offset_dofs + cbs + i*fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose(); // Extended face terms
+//                 gr_rhs.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose(); // Current cell terms
+//             }
+//         }
+//         offset_dofs += local_dofs_ex;
+//     } 
     
-    matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
-    matrix_type data = gr_rhs.transpose() * oper;
+//     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
+//     matrix_type data = gr_rhs.transpose() * oper;
 
-    return std::make_pair(oper, data);
-}
+//     return std::make_pair(oper, data);
+// }
 
 
 template<typename Mesh>

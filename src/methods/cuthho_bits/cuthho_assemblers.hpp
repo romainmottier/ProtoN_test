@@ -129,7 +129,7 @@ public:
 /*******************                                               ************************/
 /******************************************************************************************/
 
-// SCALAR ASSEMBLER
+
 template<typename Mesh, typename Function>
 class virt_scalar_assembler
 {
@@ -330,7 +330,7 @@ public:
               || location(msh, cl) == element_location::ON_INTERFACE
               || loc_zone == element_location::ON_INTERFACE ) )
             return;
-
+        
         auto asm_map = init_asm_map(msh, cl);
         auto dirichlet_data = get_dirichlet_data(msh, cl);
 
@@ -1261,89 +1261,40 @@ public:
             auto& cl = msh.cells[i];
             auto num_faces = faces(msh, cl).size();
             auto dofs = 0;
-            // std::cout << std::endl;
-            if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_NEGATIVE_SIDE) {
-                // std::cout << "UNCUT NEGATIVE CELL: " << offset(msh, cl) << std::endl;
-                // Adding the local cell and face unknowns 
-                dofs += cbs + num_faces*fbs;
-                // Loop over dependant cells 
+            if (!is_cut(msh, cl)) {
+                // std::cout << "UNCUT CELL: " << offset(msh, cl) << std::endl;
+                dofs += cbs + num_faces*fbs; // DOFS OF THE CURRENT CELL
                 // std::cout << "Dependant cells:   ";
                 for (auto &dp_cl : cl.user_data.dependent_cells_neg) {
                     // std::cout << dp_cl << "   ";
                     num_faces = faces(msh, msh.cells[dp_cl]).size();
-                    // Adding dofs of the dependent cell (bad cut part) as well as cell dofs of the 
-                    // healthy part for the computation of the jump
-                    dofs += cbs + num_faces*fbs + cbs; 
+                    dofs += 2*(cbs + num_faces*fbs); // ADDING DOFS OF BOTH SIDES OF THE DEPENDENT CELLS
                 }
-                cl.user_data.local_dofs = dofs;
                 // std::cout << std::endl;
-            }
-            else if (!is_cut(msh, cl) && cl.user_data.location == element_location::IN_POSITIVE_SIDE) {
-                // std::cout << "UNCUT POSITIVE CELL: " << offset(msh, cl) << std::endl;    
-                // Adding the local cell and face unknowns 
-                dofs += cbs + num_faces*fbs; 
-                // Loop over dependant cells 
                 // std::cout << "Dependant cells:   ";
                 for (auto &dp_cl : cl.user_data.dependent_cells_pos) {
                     // std::cout << dp_cl << "   ";
                     num_faces = faces(msh, msh.cells[dp_cl]).size();
-                    dofs += cbs + num_faces*fbs; 
+                    dofs += 2*(cbs + num_faces*fbs); // ADDING DOFS OF BOTH SIDES OF THE DEPENDENT CELLS
                 }
                 cl.user_data.local_dofs = dofs;
                 // std::cout << std::endl;
             }
-            else if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
-                // std::cout << "TOK CELL: " << offset(msh, cl) << std::endl;    
-                // Adding the local cell and face unknowns 
-                dofs += 2*(cbs + num_faces*fbs);                
-                // Loop over negative dependant cells 
+            else {
+                // std::cout << "CUT CELL: " << offset(msh, cl) << std::endl;    
+                dofs += 2*(cbs + num_faces*fbs); // DOFS OF THE CURRENT CELL
                 // std::cout << "Negative dependant cells:   ";
                 for (auto &dp_cl : cl.user_data.dependent_cells_neg) {
                     // std::cout << dp_cl << "   ";
                     num_faces = faces(msh, msh.cells[dp_cl]).size();
-                    // Adding dofs of the dependent cell (bad cut part) as well as cell dofs of the 
-                    // healthy part for the computation of the jump
-                    dofs += cbs + num_faces*fbs + cbs; 
+                    dofs += 2*(cbs + num_faces*fbs); // ADDING DOFS OF BOTH SIDES OF THE DEPENDENT CELLS
                 }
                 // std::cout << std::endl;
-                // Loop over positive dependant cells 
                 // std::cout << "Positive dependant cells:   ";
                 for (auto &dp_cl : cl.user_data.dependent_cells_pos) {
                     // std::cout << dp_cl << "   ";
                     num_faces = faces(msh, msh.cells[dp_cl]).size();
-                    dofs += cbs + num_faces*fbs; 
-                }
-                offset_ddl += dofs;
-                cl.user_data.local_dofs = dofs;
-                // std::cout << std::endl;
-            }
-            else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
-                // std::cout << "TKONEG CELL: " << offset(msh, cl) << std::endl;
-                // Adding the local cell and face unknowns 
-                dofs += cbs + num_faces*fbs;                
-                // Loop over positive dependant cells 
-                // std::cout << "Positive dependant cells:   ";
-                for (auto &dp_cl : cl.user_data.dependent_cells_pos) {
-                    // std::cout << dp_cl << "   ";
-                    num_faces = faces(msh, msh.cells[dp_cl]).size();
-                    dofs += cbs + num_faces*fbs; 
-                }
-                offset_ddl += dofs;
-                cl.user_data.local_dofs = dofs;
-                // std::cout << std::endl;
-            }        
-            else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
-                // std::cout << "TKOPOS CELL: " << offset(msh, cl) << std::endl;
-                // Adding the local cell and face unknowns 
-                dofs += cbs + num_faces*fbs;                
-                // Loop over negative dependant cells 
-                // std::cout << "Negative dependant cells:   ";
-                for (auto &dp_cl : cl.user_data.dependent_cells_neg) {
-                    // std::cout << dp_cl << "   ";
-                    num_faces = faces(msh, msh.cells[dp_cl]).size();
-                    // Adding dofs of the dependent cell (bad cut part) as well as cell dofs of the 
-                    // healthy part for the computation of the jump
-                    dofs += cbs + num_faces*fbs + cbs; 
+                    dofs += 2*(cbs + num_faces*fbs); // ADDING DOFS OF BOTH SIDES OF THE DEPENDENT CELLS
                 }
                 cl.user_data.local_dofs = dofs;
                 // std::cout << std::endl;
@@ -1353,7 +1304,7 @@ public:
         // Vérif n_dofs
         auto n_dofs = 0;
         auto verif_dofs = 0;
-        auto cp_dp_neg = 0;
+        auto cp_dp = 0;
         for(size_t i=0; i < nb_cells; i++) {
             auto cl = msh.cells[i];
             auto celdeg = hdi.cell_degree();
@@ -1369,11 +1320,11 @@ public:
             }
             verif_dofs += local_dofs;
             n_dofs += cl.user_data.local_dofs;
-            cp_dp_neg += cl.user_data.dependent_cells_neg.size();
+            cp_dp += cl.user_data.dependent_cells_neg.size() + cl.user_data.dependent_cells_pos.size();
         }
         // std::cout << "verif_dofs = " << verif_dofs << std::endl;
         // std::cout << "n_dofs = "     << n_dofs     << std::endl;
-        // std::cout << "minus cbs  = " << n_dofs-cp_dp_neg*cbs << std::endl;
+        // std::cout << "minus cbs  = " << n_dofs-cp_dp*2*(cbs+4*fbs) << std::endl;
         // std::cout << "COMPUTE_DOFS_DATA OK" << std::endl;
 
         return verif_dofs;

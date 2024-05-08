@@ -37,8 +37,8 @@ public:
         // Stabilization
         Mat stab;
         auto stab_parms = test_case.parms;
-        stab_parms.kappa_1 = 1.0/(parms.kappa_1);// rho_1 = kappa_1
-        stab_parms.kappa_2 = 1.0/(parms.kappa_2);// rho_2 = kappa_2  
+        stab_parms.kappa_1 = 1.0/(parms.kappa_1); // rho_1 = kappa_1
+        stab_parms.kappa_2 = 1.0/(parms.kappa_2); // rho_2 = kappa_2  
 
         if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
             // Gradient reconstruction

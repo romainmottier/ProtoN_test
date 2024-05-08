@@ -1296,8 +1296,12 @@ public:
                     num_faces = faces(msh, msh.cells[dp_cl]).size();
                     dofs += 2*(cbs + num_faces*fbs); // ADDING DOFS OF BOTH SIDES OF THE DEPENDENT CELLS
                 }
-                cl.user_data.local_dofs = dofs;
                 // std::cout << std::endl;
+                if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG || cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
+                    num_faces = faces(msh, msh.cells[cl.user_data.paired_cell]).size();
+                    dofs += cbs + num_faces*fbs; // ADING THE DOFS OF THE PAIRED CELL FOR THE COMPUTATION OF JUMP IN THE CURRENT CELL
+                }
+                cl.user_data.local_dofs = dofs;
             }
             // std::cout << "local dofs = " << cl.user_data.local_dofs << std::endl << std::endl;
         }
@@ -1324,7 +1328,7 @@ public:
         }
         // std::cout << "verif_dofs = " << verif_dofs << std::endl;
         // std::cout << "n_dofs = "     << n_dofs     << std::endl;
-        // std::cout << "minus cbs  = " << n_dofs-cp_dp*2*(cbs+4*fbs) << std::endl;
+        // std::cout << "minus  = " << n_dofs-cp_dp*3*(cbs+4*fbs) << std::endl;
         // std::cout << "COMPUTE_DOFS_DATA OK" << std::endl;
 
         return verif_dofs;

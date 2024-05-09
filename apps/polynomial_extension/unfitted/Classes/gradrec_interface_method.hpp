@@ -32,37 +32,31 @@ public:
                   Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>> gr_n;        
         std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>,
                   Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>> gr_p;     
-        std::pair<Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>,
-                  Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>> gr;
-        // Stabilization
-        Mat stab;
-        auto stab_parms = test_case.parms;
-        stab_parms.kappa_1 = 1.0/(parms.kappa_1); // rho_1 = kappa_1
-        stab_parms.kappa_2 = 1.0/(parms.kappa_2); // rho_2 = kappa_2  
 
+        // EXTENDED GRADIENT RECONSTRUCTIONS
         if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
             // Gradient reconstruction
             gr_n = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
             gr_p = make_hho_gradrec_vector_interface_TOK(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
-            // Stabilization
-            stab = make_hho_stabilization_interface_TOK(msh, cl, level_set_function, hdi, stab_parms);
         }
         if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) { 
             // Gradient reconstruction
             gr_n = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE);
             gr_p = make_hho_gradrec_vector_interface_TKOibar(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE, 0.0);
-            // Stabilization
-            stab = make_hho_stabilization_interface_TKO_NEG(msh, cl, level_set_function, hdi, stab_parms);  
         }
         if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
             // Gradient reconstruction 
             gr_n = make_hho_gradrec_vector_interface_TKOibar(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE, 1.0);
             gr_p = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
-            // Stabilization
-            stab = make_hho_stabilization_interface_TKO_POS(msh, cl, level_set_function, hdi, stab_parms);  
         } 
 
-        // Penalty
+        // EXTENDED STABILIZATION
+        auto stab_parms = test_case.parms;
+        stab_parms.kappa_1 = 1.0/(parms.kappa_1); // rho_1 = kappa_1
+        stab_parms.kappa_2 = 1.0/(parms.kappa_2); // rho_2 = kappa_2  
+        Mat stab = make_hho_stabilization_interface_extended(msh, cl, level_set_function, hdi, stab_parms);
+
+        // EXTENDED PENALTY
         T penalty_scale = std::min(1.0/(parms.kappa_1), 1.0/(parms.kappa_2));
         Mat penalty = make_hho_cut_interface_penalty(msh, cl, hdi, eta).block(0, 0, cbs, cbs);
         stab.block(0, 0, cbs, cbs)     += penalty_scale * penalty;

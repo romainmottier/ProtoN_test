@@ -72,10 +72,10 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
     size_t system_size = assembler.compute_dofs_data(msh, hdi);
     auto dofs_proj = assembler.make_projection_operator(msh, hdi, system_size, sol_fun);
     for (auto& cell : msh.cells) {
-      // ////////// DEBUG
-      // auto offset_cl = offset(msh, cell);
-      // std::cout << "Cell: " << offset_cl << std::endl;
-      // //////////
+      ////////// DEBUG
+      auto offset_cl = offset(msh, cell);
+      std::cout << "Cell: " << offset_cl << std::endl;
+      //////////
       auto contrib = method.make_contrib(msh, cell, test_case, hdi);
       auto lc = contrib.first;
       auto f = contrib.second;
@@ -83,7 +83,7 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
       size_t n_dof = assembler.n_dof(msh,cell);
       Matrix<RealType, Dynamic, Dynamic> mass = Matrix<RealType, Dynamic, Dynamic>::Zero(n_dof,n_dof);
       mass.block(0,0,cell_mass.rows(),cell_mass.cols()) = cell_mass;
-      assembler.assemble(msh, cell, lc, f);    // A DEBUGUER PLUS TARD NIK SA MERE (APRES STAB+ PENALISATION)
+      // assembler.assemble(msh, cell, lc, f);    // A DEBUGUER PLUS TARD NIK SA MERE (APRES STAB+ PENALISATION)
       // assembler.assemble_mass(msh, cell, mass);
     }
 

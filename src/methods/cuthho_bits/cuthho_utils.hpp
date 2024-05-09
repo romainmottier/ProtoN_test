@@ -575,13 +575,13 @@ make_hho_stabilization_interface_extended(const cuthho_mesh<T, ET>& msh,
 
     // SETTING DEPENDENT CELLS
     Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic> stab_n_ex, stab_p_ex;
-    auto dp_cells = cl.user_data.dependent_cells_neg;
     typename cuthho_mesh<T, ET>::cell_type dp_cell;
     size_t offset_dofs_extended = 3*local_dofs; 
     if (cl.user_data.agglo_set == cell_agglo_set::T_OK) 
         offset_dofs_extended = 2*local_dofs; 
     
     // STABILIZATION IN THE NEGATIVE DEPENDENT CELLS
+    auto dp_cells = cl.user_data.dependent_cells_neg;
     for (auto &dp_cl : dp_cells) {
         dp_cell = msh.cells[dp_cl];
         stab_n_ex = make_hho_cut_stabilization_extended(msh, dp_cell, di, element_location::IN_NEGATIVE_SIDE, scaled_Q);
@@ -706,33 +706,76 @@ template<typename T, size_t ET>
 Matrix<typename cuthho_mesh<T, ET>::coordinate_type, Dynamic, Dynamic>
 make_hho_cut_interface_penalty_extended(const cuthho_mesh<T, ET>& msh,
                                const typename cuthho_mesh<T, ET>::cell_type& cl,
-                               const hho_degree_info& di, const T eta, bool scaled_Q = true)
+                               const hho_degree_info& di, const T eta, const params<T>& parms = params<T>(), 
+                               bool scaled_Q = true)
 {
+
     auto celdeg = di.cell_degree();
     auto facdeg = di.face_degree();
-
     auto cbs = cell_basis<cuthho_mesh<T, ET>,T>::size(celdeg);
     auto fbs = face_basis<cuthho_mesh<T, ET>,T>::size(facdeg);
-
     auto num_faces = faces(msh, cl).size();
+    auto local_dofs = cbs + num_faces*fbs;
+    auto total_dofs = cl.user_data.local_dofs;
 
-    cell_basis<cuthho_mesh<T, ET>,T> cb(msh, cl, celdeg);
+    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(total_dofs, total_dofs);
+    auto penalty_scale = std::min(1.0/(parms.kappa_1), 1.0/(parms.kappa_2));
 
-    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(cbs+num_faces*fbs, cbs+num_faces*fbs);
 
     auto hT = diameter(msh, cl);
+    cell_basis<cuthho_mesh<T, ET>,T> cb(msh, cl, celdeg);
 
-    auto iqps = integrate_interface(msh, cl, 2*celdeg, element_location::IN_NEGATIVE_SIDE);
-    for (auto& qp : iqps) {
-        const auto c_phi  = cb.eval_basis(qp.first);
-        if (scaled_Q) {
-            data.block(0, 0, cbs, cbs) += qp.second * c_phi * c_phi.transpose() * eta / hT;
-        }
-        else {
-            data.block(0, 0, cbs, cbs) += qp.second * c_phi * c_phi.transpose() * eta;
-        }
+    // PENALIZATION IN THE CURRENT CELL 
+    if (cl.user_data.agglo_set == cell_agglo_set::T_OK) {
+        auto penalty = make_hho_cut_interface_penalty(msh, cl, di, eta).block(0, 0, cbs, cbs);
+        data.block(0, 0, cbs, cbs)     += penalty_scale * penalty; // (u_T^1,w_T^1)
+        data.block(0, cbs, cbs, cbs)   -= penalty_scale * penalty; // (u_T^2,w_T^1)
+        data.block(cbs, 0, cbs, cbs)   -= penalty_scale * penalty; // (u_T^1,w_T^2)
+        data.block(cbs, cbs, cbs, cbs) += penalty_scale * penalty; // (u_T^2,w_T^2)
+    }
+    else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG) {
+        auto offset = 2*local_dofs;
+        auto penalty = make_hho_cut_interface_penalty(msh, cl, di, eta).block(0, 0, cbs, cbs); //A CHANGER
+        data.block(offset, offset, cbs, cbs) += penalty_scale * penalty; // (u_N(T^1),w_N(T^1))
+        data.block(offset, cbs, cbs, cbs)    -= penalty_scale * penalty; // (u_T^2   ,w_N(T^1))
+        data.block(cbs, offset, cbs, cbs)    -= penalty_scale * penalty; // (u_N(T^1),w_T^2)
+        data.block(cbs, cbs, cbs, cbs)       += penalty_scale * penalty; // (u_T^2   ,w_T^2)
+    }
+    else if (cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
+        auto offset = 2*local_dofs;
+        auto penalty = make_hho_cut_interface_penalty(msh, cl, di, eta).block(0, 0, cbs, cbs); //A CHANGER
+        data.block(0, 0, cbs, cbs)           += penalty_scale * penalty; // (u_T^1,   w_T^1)
+        data.block(0, offset, cbs, cbs)      -= penalty_scale * penalty; // (u_N(T^2),w_T^1)
+        data.block(offset, 0, cbs, cbs)      -= penalty_scale * penalty; // (u_T^1,   w_N(T^2))
+        data.block(offset, offset, cbs, cbs) += penalty_scale * penalty; // (u_N(T^2),w_N(T^2))
     }
 
+    // PENALIZATION IN THE EXTENTED CELLS
+    auto dp_cells = cl.user_data.dependent_cells_neg;
+    auto offset_dofs_extended = 2*local_dofs;
+    // LOOP OVER NEGATIVE DEPENDENT CELLS   
+    for (auto& dp_cl : dp_cells) {
+        auto dp_cell = msh.cells[dp_cl];
+        cell_basis<cuthho_mesh<T, ET>,T> dp_cb(msh, dp_cell, celdeg);
+        auto iqps = integrate_interface(msh, dp_cell, 2*celdeg, element_location::IN_NEGATIVE_SIDE);
+        for (auto& qp : iqps) {
+            const auto c_phi    = cb.eval_basis(qp.first);
+            const auto c_dp_phi = dp_cb.eval_basis(qp.first);
+            if (scaled_Q) {
+                data.block(0, 0, cbs, cbs) += penalty_scale*(qp.second*c_phi*c_phi.transpose()*eta/hT);                                                         // (u_T^1,w_T^1)
+                data.block(0, offset_dofs_extended + cbs, cbs, cbs) -= penalty_scale*(qp.second*c_phi*c_dp_phi.transpose()*eta/hT);                             // (u_S^2,w_T^1)
+                data.block(offset_dofs_extended + cbs, 0, cbs, cbs) -= penalty_scale*(qp.second*c_dp_phi*c_phi.transpose()*eta/hT);                             // (u_T^1,w_S^2)
+                data.block(offset_dofs_extended + cbs, offset_dofs_extended + cbs, cbs, cbs) += penalty_scale*(qp.second*c_dp_phi*c_dp_phi.transpose()*eta/hT); // (u_S^2,w_S^2)
+            }
+            else {
+                data.block(0, 0, cbs, cbs) += penalty_scale*(qp.second*c_phi*c_phi.transpose()*eta);                                                         // (u_T^1,w_T^1)
+                data.block(0, offset_dofs_extended + cbs, cbs, cbs) -= penalty_scale*(qp.second*c_phi*c_dp_phi.transpose()*eta);                             // (u_S^2,w_T^1)
+                data.block(offset_dofs_extended + cbs, 0, cbs, cbs) -= penalty_scale*(qp.second*c_dp_phi*c_phi.transpose()*eta);                             // (u_T^1,w_S^2)
+                data.block(offset_dofs_extended + cbs, offset_dofs_extended + cbs, cbs, cbs) += penalty_scale*(qp.second*c_dp_phi*c_dp_phi.transpose()*eta); // (u_S^2,w_S^2)
+            }
+        }
+        offset_dofs_extended += 2*local_dofs;
+    }
     return data;
 }
 
@@ -1523,6 +1566,7 @@ make_hho_gradrec_vector_interface_TKOibar(const cuthho_mesh<T, ET>& msh,
 
     return std::make_pair(oper, data);
 }
+
 
 //////////////////////////////////////// NITSCHE TERMS ////////////////////////////////////////
 template<typename T, size_t ET, typename Function>

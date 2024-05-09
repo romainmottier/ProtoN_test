@@ -50,19 +50,17 @@ public:
             gr_p = make_hho_gradrec_vector_interface_TKOi(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE);
         } 
 
-        // EXTENDED STABILIZATION
+        // STABILIZATION PARAMETERS
         auto stab_parms = test_case.parms;
         stab_parms.kappa_1 = 1.0/(parms.kappa_1); // rho_1 = kappa_1
         stab_parms.kappa_2 = 1.0/(parms.kappa_2); // rho_2 = kappa_2  
+
+        // EXTENDED STABILIZATION
         Mat stab = make_hho_stabilization_interface_extended(msh, cl, level_set_function, hdi, stab_parms);
 
         // EXTENDED PENALTY
-        T penalty_scale = std::min(1.0/(parms.kappa_1), 1.0/(parms.kappa_2));
-        Mat penalty = make_hho_cut_interface_penalty(msh, cl, hdi, eta).block(0, 0, cbs, cbs);
-        stab.block(0, 0, cbs, cbs)     += penalty_scale * penalty;
-        stab.block(0, cbs, cbs, cbs)   -= penalty_scale * penalty;
-        stab.block(cbs, 0, cbs, cbs)   -= penalty_scale * penalty;
-        stab.block(cbs, cbs, cbs, cbs) += penalty_scale * penalty;
+        auto penalty_extended = make_hho_cut_interface_penalty_extended(msh, cl, hdi, eta, stab_parms);
+        stab += penalty_extended;
 
         // STAB + RECONSTRUCTION     
         // std::cout << "DIMENSION STAB: " << stab.size() << std::endl;

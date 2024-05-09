@@ -41,19 +41,19 @@ public:
     make_contrib_uncut(const Mesh& msh, const typename Mesh::cell_type& cl,
                        const hho_degree_info hdi, const testType &test_case) {
 
+        // PARAMETERS
         T kappa;
         if (location(msh, cl) == element_location::IN_NEGATIVE_SIDE)
             kappa = test_case.parms.kappa_1;
         else
             kappa = test_case.parms.kappa_2;
-        
+        auto stab_parms = test_case.parms;
         auto level_set_function = test_case.level_set_;
+
+        // OPERATORS
         auto gr  = make_hho_gradrec_vector_extended(msh, cl, hdi, level_set_function);
-        // std::cout << "Gradient reconstruction UNCUT OK" << std::endl;
-        Mat stab = make_hho_naive_stabilization_extended(msh, cl, hdi);
-        // std::cout << "Stabilization UNCUT OK" << std::endl;
+        Mat stab = make_hho_naive_stabilization_extended(msh, cl, hdi, stab_parms);
         Mat lc   = kappa * (gr.second + stab);    
-        // std::cout << "STAB + GRADREC OK" << std::endl;
         Mat f    = make_rhs(msh, cl, hdi.cell_degree(), test_case.rhs_fun);
 
         //  std::cout << "r = " << gr.second << std::endl;

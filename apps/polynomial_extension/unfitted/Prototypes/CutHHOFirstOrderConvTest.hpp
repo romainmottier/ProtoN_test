@@ -110,7 +110,7 @@ void CutHHOFirstOrderConvTest(int argc, char **argv){
             }
             
             auto test_case = make_test_case_laplacian_conv(msh, level_set_function); // Analytical solution
-            auto method = make_gradrec_mixed_interface_method(msh, 1.0, test_case);  // Reconstruction operator
+            auto method = make_gradrec_mixed_interface_method(msh, 1.0, test_case);  // Reconstruction operator (initialization eta)
             
             // Assembly stiffness matrix
             std::vector<std::pair<size_t,size_t>> cell_basis_data = create_mixed_kg_and_mg_cuthho_interface(msh, hdi, method, test_case, Kg, Mg, false);

@@ -243,6 +243,87 @@ public:
 
         return asm_map;
     }
+    
+    std::vector<assembly_index>
+    init_asm_map_extended(const Mesh& msh, const typename Mesh::cell_type& cl)
+    {
+        bool double_unknowns = ( location(msh, cl) == element_location::ON_INTERFACE
+                                 && loc_zone == element_location::ON_INTERFACE );
+
+        std::vector<assembly_index> asm_map;
+
+        // DOFS
+        auto celdeg = di.cell_degree();
+        auto facdeg = di.face_degree();
+        auto cbs = cell_basis<Mesh,T>::size(celdeg);
+        auto fbs = face_basis<Mesh,T>::size(facdeg);
+        auto fcs = faces(msh, cl);
+        auto num_faces = fcs.size();
+        auto local_dofs = cbs + num_faces*fbs;
+        asm_map.reserve(cl.user_data.local_dofs);
+
+        // CELL OFFSET
+        size_t cell_offset = cell_table.at(offset(msh, cl)); // va deux en deux quand c'est cut 
+        size_t cell_LHS_offset = cell_offset*cbs;
+        if(is_cut(msh,cl))
+            cbs = 2*cbs;
+
+        // ASSEMBLY OF THE DOFS OF THE CURRENT CELLS 
+
+        // CELL DOFS
+        for (size_t i = 0; i < cbs; i++)
+            asm_map.push_back(assembly_index(cell_LHS_offset+i, true));
+
+        // FACES DOFS
+        for (size_t face_i = 0; face_i < num_faces; face_i++) {
+            auto fc = fcs[face_i];
+            auto face_LHS_offset = face_SOL_offset(msh, fc);
+            bool in_dom = true;
+            if (loc_zone != element_location::ON_INTERFACE) {
+                element_location loc_fc = location(msh, fc);
+                in_dom = (loc_fc == element_location::ON_INTERFACE || loc_fc == loc_zone);
+            }
+            bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET && in_dom;
+            for (size_t i = 0; i < fbs; i++)
+                asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet));
+        }
+
+        // ASSEMBLY OF THE FACES IN THE POSITIVE SIDE IF THE CELL IS CUT 
+        if(is_cut(msh,cl)) {
+            for (size_t face_i = 0; face_i < num_faces; face_i++) {
+                auto fc = fcs[face_i];
+                auto d = (location(msh, fc) == element_location::ON_INTERFACE) ? fbs : 0;
+                auto face_LHS_offset = face_SOL_offset(msh, fc) + d;
+                bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET;
+                if (dirichlet)
+                    std::cout << "Dirichlet boundary on cut cell detected." << std::endl;
+                for (size_t i = 0; i < fbs; i++)
+                    asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
+            }
+        }
+
+        // ASSEMBLY OF THE PAIRED DOFS IF THE CELL IS ILL-CUT 
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG || cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
+            std::cout << "ADDING ASSEMBLY OF PAIRED DOFS IN INIT_ASM" << std::endl;
+        }
+
+        // ASSEMBLY OF THE DEPENDEND DOFS 
+        size_t offset_dofs_extended = 3*local_dofs; // CURRENT DOFS + PAIRED DOFS FOR THE JUMP
+        if (cl.user_data.agglo_set == cell_agglo_set::T_OK) 
+            offset_dofs_extended = 2*local_dofs;
+        // LOOP OVER NEGATIVE DEPENDENT CELLS
+        auto dp_cells = cl.user_data.dependent_cells_neg;
+        for (auto &dp_cl : dp_cells) {
+            std::cout << "ADDING ASSEMBLY OF NEGATIVE DEPENDENT CELLS IN INIT_ASM" << std::endl;
+        }
+        // LOOP OVER POSITIVE DEPENDENT CELLS
+        dp_cells = cl.user_data.dependent_cells_pos;
+        for (auto &dp_cl : dp_cells) {
+            std::cout << "ADDING ASSEMBLY OF POSITIVE DEPENDENT CELLS IN INIT_ASM" << std::endl;
+        }
+
+        return asm_map;
+    }
 
     size_t
     n_dof(const Mesh& msh, const typename Mesh::cell_type& cl)
@@ -321,6 +402,53 @@ public:
         return dirichlet_data;
     }
 
+    Matrix<T, Dynamic, 1>
+    get_dirichlet_data_extended(const Mesh& msh, const typename Mesh::cell_type& cl) {
+
+        // DOFS
+        auto celdeg = di.cell_degree();
+        auto facdeg = di.face_degree();
+        auto cbs = cell_basis<Mesh,T>::size(celdeg);
+        auto fbs = face_basis<Mesh,T>::size(facdeg);
+        auto fcs = faces(msh, cl);
+        auto num_faces = fcs.size();
+        auto local_dofs = cbs + num_faces*fbs;
+
+        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(cl.user_data.local_dofs);
+
+        // LOOP OVER FACES
+        for (size_t face_i = 0; face_i < num_faces; face_i++) {
+            
+            auto fc = fcs[face_i];
+            auto face_LHS_offset = face_SOL_offset(msh, fc);
+
+            bool in_dom = true;
+            if (loc_zone != element_location::ON_INTERFACE) {
+                element_location loc_fc = location(msh, fc);
+                bool in_dom = (loc_fc == element_location::ON_INTERFACE ||
+                               loc_fc == loc_zone);
+            }
+
+            bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET && in_dom;
+
+            if (dirichlet && is_cut(msh,cl))
+                std::cout << "Dirichlet boundary on cut cell detected." << std::endl;
+
+            if (dirichlet && loc_zone == element_location::ON_INTERFACE ) {
+                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, facdeg);
+                Matrix<T, Dynamic, 1> loc_rhs = make_rhs(msh, fc, facdeg, dir_func);
+                dirichlet_data.block(cbs + face_i*fbs, 0, fbs, 1) = mass.ldlt().solve(loc_rhs);
+            }
+            if (dirichlet && loc_zone != element_location::ON_INTERFACE ) {
+                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, facdeg, loc_zone);
+                Matrix<T, Dynamic, 1> loc_rhs = make_rhs(msh, fc, facdeg, loc_zone, dir_func);
+                dirichlet_data.block(cbs + face_i*fbs, 0, fbs, 1) = mass.ldlt().solve(loc_rhs);
+            }
+        }
+        std::cout << "ADDING DEPENDENT CELLS DOFS IN GET_DIRICHLET_DATA_EXTENDED" << std::endl;
+
+        return dirichlet_data;
+    }
 
     void
     assemble_bis(const Mesh& msh, const typename Mesh::cell_type& cl,
@@ -362,6 +490,49 @@ public:
         }
     }
          
+    void
+    assemble_bis_extended(const Mesh& msh, const typename Mesh::cell_type& cl,
+                 const Matrix<T, Dynamic, Dynamic>& lhs, const Matrix<T, Dynamic, 1>& rhs)
+    {
+        if( !(location(msh, cl) == loc_zone
+              || location(msh, cl) == element_location::ON_INTERFACE
+              || loc_zone == element_location::ON_INTERFACE ) )
+            return;
+        
+        auto asm_map = init_asm_map_extended(msh, cl);
+        auto dirichlet_data = get_dirichlet_data_extended(msh, cl);
+
+        std::cout << "asm_map.size() = " << asm_map.size() << std::endl;
+        std::cout << "lhs.rows() = "     << lhs.rows()     << std::endl;
+        std::cout << "lhs.cols() = "     << lhs.cols()     << std::endl;
+        assert(asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols());
+
+        for (size_t i = 0; i < lhs.rows(); i++)
+        {
+            if (!asm_map[i].assemble())
+                continue;
+
+            for (size_t j = 0; j < lhs.cols(); j++)
+            {
+                if ( asm_map[j].assemble() )
+                    triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
+                else {
+	            int itmp=asm_map[i];
+                    RHS(itmp) -= lhs(i,j)*dirichlet_data(j);
+		}
+            }
+        }
+        // RHS
+        for (size_t i = 0; i < rhs.rows(); i++)
+        {
+            if (!asm_map[i].assemble())
+                continue;
+
+	    int itmp = asm_map[i];
+            RHS(itmp) += rhs(i);
+        }
+    }
+                  
     void
     assemble_rhs_bis(const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, 1>& rhs)
     {
@@ -967,7 +1138,7 @@ auto make_interface_assembler(const Mesh& msh, Function dirichlet_bf, hho_degree
     return interface_assembler<Mesh, Function>(msh, dirichlet_bf, hdi);
 }
 
-// POLYNOMIAL EXTENSION ASSEMBLER - ELLIPTIC PROBLEM - FIRST ORDER FORMULATION
+// ELLIPTIC PROBLEM - FIRST ORDER FORMULATION
 template<typename Mesh, typename Function>
 class one_field_interface_assembler : public virt_interface_assembler<Mesh, Function>
 {
@@ -1000,6 +1171,13 @@ public:
              const Matrix<T, Dynamic, Dynamic>& lhs, const Matrix<T, Dynamic, 1>& rhs)
     {
         this->assemble_bis(msh, cl, lhs, rhs);
+    }
+
+    void
+    assemble_extended(const Mesh& msh, const typename Mesh::cell_type& cl,
+             const Matrix<T, Dynamic, Dynamic>& lhs, const Matrix<T, Dynamic, 1>& rhs)
+    {
+        this->assemble_bis_extended(msh, cl, lhs, rhs);
     }
            
     void

@@ -68,7 +68,7 @@ public:
         // std::cout << "DIMENSION GRADREC POS: " << gr_p.second.size() << std::endl;
         Mat lc = stab_parms.kappa_1*gr_n.second + stab_parms.kappa_2*gr_p.second + stab;
         
-        // RIGHT HAND SIDE
+        // RIGHT HAND SIDE (PROBABLEMENT A MODIFIER)
         Vect f = Vect::Zero(lc.rows());
         // NEGATIVE SIDE
         f.block(0, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun, element_location::IN_NEGATIVE_SIDE);

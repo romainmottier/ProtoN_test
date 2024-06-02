@@ -70,6 +70,7 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
     auto assembler = make_one_field_interface_assembler(msh, bcs_fun, hdi);
     std::vector<std::pair<size_t,size_t>> cell_basis_data = assembler.compute_cell_basis_data(msh);
     size_t system_size = assembler.compute_dofs_data(msh, hdi);
+    std::cout << "System size: " << system_size << std::endl;
     auto dofs_proj = assembler.make_projection_operator(msh, hdi, system_size, sol_fun);
     for (auto& cell : msh.cells) {
       ////////// DEBUG

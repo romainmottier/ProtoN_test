@@ -259,7 +259,6 @@ public:
         auto fbs = face_basis<Mesh,T>::size(facdeg);
         auto fcs = faces(msh, cl);
         auto num_faces = fcs.size();
-        auto local_dofs = cbs + num_faces*fbs;
         asm_map.reserve(cl.user_data.local_dofs);
 
         // CELL OFFSET

@@ -264,7 +264,7 @@ public:
         // CELL OFFSET
         size_t cell_offset = cell_table.at(offset(msh, cl)); 
         size_t cell_LHS_offset = cell_offset*cbs;
-        auto cbs_cut = 2*cbs;
+        auto cbs_cut = 2*cbs; // CELL DEGREES OF FREEDOM OF DEPENDENT CELLS 
         if(is_cut(msh,cl))
             cbs = 2*cbs;
 

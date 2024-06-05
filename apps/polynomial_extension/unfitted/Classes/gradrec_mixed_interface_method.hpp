@@ -30,13 +30,11 @@ public:
         auto cbs = cell_basis<Mesh,T>::size(celdeg);
         auto rbs = vector_cell_basis<Mesh,T>::size(graddeg);
 
-        // GR
-        auto gr_n = make_hho_gradrec_mixed_vector_interface(msh, cl, level_set_function, hdi,
-                                                      element_location::IN_NEGATIVE_SIDE, 1.0);
-        auto gr_p = make_hho_gradrec_mixed_vector_interface(msh, cl, level_set_function, hdi,
-                                                      element_location::IN_POSITIVE_SIDE, 0.0);
+        // GRADIENT RECONSTRUCTION
+        auto gr_n = make_hho_gradrec_mixed_vector_interface(msh, cl, level_set_function, hdi, element_location::IN_NEGATIVE_SIDE, 1.0);
+        auto gr_p = make_hho_gradrec_mixed_vector_interface(msh, cl, level_set_function, hdi, element_location::IN_POSITIVE_SIDE, 0.0);
 
-        // stab
+        // STABILIZATION
         auto stab_parms = test_case.parms;
         stab_parms.kappa_1 = 1.0/(parms.c_1*parms.kappa_1);// rho_1 = kappa_1
         stab_parms.kappa_2 = 1.0/(parms.c_2*parms.kappa_2);// rho_2 = kappa_2
@@ -58,17 +56,21 @@ public:
         auto n_s_rows = stabilization_operator.rows();
         auto n_s_cols = stabilization_operator.cols();
         S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
+
+        // GRADREC + STAB
         Mat lc = R_operator + S_operator;
 
-        
-        ///////////////    RHS
+        /////////////// RHS
         Vect f = Vect::Zero((cbs+rbs)*2);
-        // neg part
-        f.block(2*rbs, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun,
-                                          element_location::IN_NEGATIVE_SIDE);
-        // pos part
-        f.block(2*rbs+cbs, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun,
-                                           element_location::IN_POSITIVE_SIDE);
+        std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << rbs << std::endl;
+        std::cout << "rbs = " << rbs << std::endl;
+        // NEGATIVE PART
+        f.block(2*rbs, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun, element_location::IN_NEGATIVE_SIDE);
+        
+        // POSITIVE PART
+        f.block(2*rbs+cbs, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun, element_location::IN_POSITIVE_SIDE);
+
+
         return std::make_pair(lc, f);
     }
 

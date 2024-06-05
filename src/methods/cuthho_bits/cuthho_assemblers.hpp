@@ -269,7 +269,6 @@ public:
         if(is_cut(msh,cl))
             cbs = 2*cbs;
 
-
         ///////////////////////////////////////////// ASSEMBLY OF THE DOFS OF THE CURRENT CELLS 
         // CELL DOFS
         for (size_t i = 0; i < cbs; i++)
@@ -453,8 +452,7 @@ public:
                                loc_fc == loc_zone);
             }
 
-            bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET
-                && in_dom;
+            bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET && in_dom;
 
             if( dirichlet && double_unknowns )
                 std::cout << "Dirichlet boundary on cut cell detected." << std::endl;
@@ -580,31 +578,37 @@ public:
         std::cout << "asm_map.size() = " << asm_map.size() << std::endl;
         std::cout << "lhs.rows() = "     << lhs.rows()     << std::endl;
         std::cout << "lhs.cols() = "     << lhs.cols()     << std::endl;
+        std::cout << "rhs.rows() = "     << rhs.rows()     << std::endl;
         assert(asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols());
 
-        for (size_t i = 0; i < lhs.rows(); i++)
-        {
+        // ASSEMBLY OF STIFFNESS MATRIX
+        for (size_t i = 0; i < lhs.rows(); i++) {
+
             if (!asm_map[i].assemble())
                 continue;
 
-            for (size_t j = 0; j < lhs.cols(); j++)
-            {
-                if ( asm_map[j].assemble() )
+            for (size_t j = 0; j < lhs.cols(); j++) {
+                if (asm_map[j].assemble())
                     triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
                 else {
-	            int itmp=asm_map[i];
+	                int itmp=asm_map[i];
                     RHS(itmp) -= lhs(i,j)*dirichlet_data(j);
 		        }
             }
         }
-        // RHS
-        for (size_t i = 0; i < rhs.rows(); i++)
-        {
+        std::cout << "BEFORE RHS ASSEMBLY" << std::endl;
+        
+        // ASSEMBLY OF THE RHS
+        for (size_t i = 0; i < rhs.rows(); i++) {
             if (!asm_map[i].assemble())
                 continue;
 
-	    int itmp = asm_map[i];
-            RHS(itmp) += rhs(i);
+            int itmp   = asm_map[i]; 
+            std::cout << "itmp = "   << itmp   << std::endl;
+            std::cout << "rhs(i) = " << rhs(i) << std::endl;
+            std::cout << "RHS.size() = " << RHS.size() << std::endl;
+            std::cout << "rhs.size() = " << rhs.size() << std::endl;
+            RHS(itmp) += rhs(i);           ///////////// PROBLEM HERE ON THE RHS SIZE 
         }
         std::cout << "TEST FINAL" << std::endl;
     }
@@ -1235,10 +1239,14 @@ public:
         this->loc_cbs = cbs;
         auto system_size = cbs * this->num_cells + fbs * this->num_other_faces;
 
-        this->LHS = SparseMatrix<T>( system_size, system_size );
-        this->RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
-        this->MASS = SparseMatrix<T>( system_size, system_size );
+        this->LHS = SparseMatrix<T>(system_size, system_size);
+        this->RHS = Matrix<T, Dynamic, 1>::Zero( system_size);
+        this->MASS = SparseMatrix<T>(system_size, system_size);
         
+        std::cout << "LHS.size() = " << this->LHS.size() << std::endl;
+        std::cout << "RHS.size() = " << this->RHS.size() << std::endl;
+        std::cout << "MASS.size() = " << this->MASS.size() << std::endl;
+
         classify_cells(msh);
     }
 

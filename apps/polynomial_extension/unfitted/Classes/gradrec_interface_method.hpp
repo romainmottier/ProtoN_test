@@ -72,7 +72,7 @@ public:
         Vect f = Vect::Zero(lc.rows());
         // NEGATIVE SIDE
         f.block(0, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun, element_location::IN_NEGATIVE_SIDE);
-        f.head(cbs) -= parms.kappa_1*make_Dirichlet_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE, level_set_function, dir_jump, eta);
+        f.head(cbs)           -= parms.kappa_1*make_Dirichlet_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE, level_set_function, dir_jump, eta);
         // POSITIVE SIDE
         f.block(cbs, 0, cbs, 1) += make_rhs(msh, cl, celdeg, test_case.rhs_fun, element_location::IN_POSITIVE_SIDE);
         f.block(cbs, 0, cbs, 1) += parms.kappa_1*make_Dirichlet_jump(msh, cl, celdeg, element_location::IN_POSITIVE_SIDE, level_set_function, dir_jump, eta);
@@ -81,16 +81,17 @@ public:
         // RHS TERM WITH GRADIENT RECONSTRUCTION
         auto gbs = vector_cell_basis<cuthho_poly_mesh<T>,T>::size(hdi.grad_degree());
         vector_cell_basis<cuthho_poly_mesh<T>, T> gb( msh, cl, hdi.grad_degree() );
-        Matrix<T, Dynamic, 1> F_bis = Matrix<T, Dynamic, 1>::Zero( gbs );
+        Matrix<T, Dynamic, 1> F_bis = Matrix<T, Dynamic, 1>::Zero(gbs);
         auto iqps = integrate_interface(msh, cl, 2*hdi.grad_degree(), element_location::IN_NEGATIVE_SIDE);
         for (auto& qp : iqps) {
             const auto g_phi = gb.eval_basis(qp.first);
             const Matrix<T,2,1> n = level_set_function.normal(qp.first);
             F_bis += qp.second * dir_jump(qp.first) * g_phi * n;
         }
-        f -= F_bis.transpose() * (parms.kappa_1 * gr_n.first );
+        f -= F_bis.transpose() * (parms.kappa_1*gr_n.first );
 
         return std::make_pair(lc, f);
+        
     }
 
     Vect

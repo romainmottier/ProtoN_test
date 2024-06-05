@@ -85,8 +85,8 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
       Matrix<RealType, Dynamic, Dynamic> mass = Matrix<RealType, Dynamic, Dynamic>::Zero(n_dof,n_dof);
       mass.block(0,0,cell_mass.rows(),cell_mass.cols()) = cell_mass;
       assembler.assemble_extended(msh, cell, lc, f);  
-      std::cout << "ASSEMBLAGE OK" << std::endl;  
-      assembler.assemble_mass(msh, cell, mass);
+      // std::cout << "ASSEMBLAGE OK" << std::endl;  
+      // assembler.assemble_mass(msh, cell, mass);
     }
 
     

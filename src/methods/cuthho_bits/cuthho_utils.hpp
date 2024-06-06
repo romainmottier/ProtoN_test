@@ -1541,7 +1541,7 @@ make_hho_gradrec_vector_interface_TKOibar(const cuthho_mesh<T, ET>& msh,
             interface_term.block(0 , cbs, gbs, cbs) += qp_g_phi_n*c_phi.transpose();
         }
         gr_rhs.block(0, 0, gbs, cbs)            += interface_term.block(0, 0, gbs, cbs);   // NEG CELL DOFS
-        gr_rhs.block(0, 2*local_dofs, gbs, cbs) += interface_term.block(0, cbs, gbs, cbs); // POS CELL DOFS OF THE PAIRED CELL
+        gr_rhs.block(0, 3*local_dofs, gbs, cbs) += interface_term.block(0, cbs, gbs, cbs); // POS CELL DOFS OF THE PAIRED CELL
     }
 
     // ELEMENT LOCATION OF THE TOK CELL AND ITS DEPENDENT CELLS
@@ -1551,7 +1551,7 @@ make_hho_gradrec_vector_interface_TKOibar(const cuthho_mesh<T, ET>& msh,
     auto nb_dp_cells = dp_cells.size();
 
     // LOOP OVER DEPENDENT CELLS  
-    size_t offset_dofs_extended = 3*local_dofs; // CURRENT DOFS + PAIRED DOFS FOR THE JUMP
+    size_t offset_dofs_extended = 4*local_dofs; // CURRENT DOFS + PAIRED DOFS FOR THE JUMP
     for (auto &dp_cl : dp_cells) {
         
         auto dp_cell = msh.cells[dp_cl];

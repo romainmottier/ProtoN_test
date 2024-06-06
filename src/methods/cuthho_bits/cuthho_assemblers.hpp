@@ -299,7 +299,7 @@ public:
 
         ///////////////////////////////////////////// ASSEMBLY OF THE PAIRED DOFS IF THE CURRENT CELL IS ILL-CUT 
         ///////////////////////////////////////////// PAIRED CELL = WHICH STABILIZES THE CURRENT CELL 
-        if (is_cut(msh,cl)) {
+        if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG || cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
             // CELL DOFS
             auto cbs_loc = cbs; 
             auto paired_cl = msh.cells[cl.user_data.paired_cell];
@@ -335,80 +335,38 @@ public:
 
         ///////////////////////////////////////////// ASSEMBLY OF THE DEPENDEND DOFS 
         // DEPENDENT CELLS = CELLS STABILIZED BY THE CURRENT CELL
-        // LOOP OVER NEGATIVE DEPENDENT CELLS
+        // LOOP OVER DEPENDENT CELLS
         std::set<std::set<size_t>> dp_cell_domains;
         dp_cell_domains.insert(cl.user_data.dependent_cells_neg);
         dp_cell_domains.insert(cl.user_data.dependent_cells_pos);
-        auto dp_cellsbis = make_pair(cl.user_data.dependent_cells_neg,cl.user_data.dependent_cells_neg);
         for (auto &where : dp_cell_domains) {
-            std::cout << "DEPENDENT CELLS: ";
             for (auto &dp_cl : where) {
-                std::cout << "   " << dp_cl;
-            }
-            std::cout << std::endl;
-        }
-        auto dp_cells = cl.user_data.dependent_cells_neg;
-        for (auto &dp_cl : dp_cells) {
-            // CELL DOFS
-            auto dp_cell = msh.cells[dp_cl];
-            cell_offset = cell_table.at(offset(msh, dp_cell)); 
-            cell_LHS_offset = cell_offset*cbs;
-            for (size_t i = 0; i < cbs_cut; i++)
-                asm_map.push_back(assembly_index(cell_LHS_offset+i, true));
-            // FACES DOFS
-            fcs = faces(msh, dp_cell);
-            for (size_t face_i = 0; face_i < num_faces; face_i++) {
-                auto fc = fcs[face_i];
-                auto face_LHS_offset = face_SOL_offset(msh, fc);
-                bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET;
-                for (size_t i = 0; i < fbs; i++)
-                    asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet));
-            }
-            // ASSEMBLY OF THE FACES IN THE POSITIVE SIDE 
-            for (size_t face_i = 0; face_i < num_faces; face_i++) {
-                auto fc = fcs[face_i];
-                auto d = (location(msh, fc) == element_location::ON_INTERFACE) ? fbs : 0;
-                auto face_LHS_offset = face_SOL_offset(msh, fc) + d;
-                bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET;
-                if (dirichlet)
-                    std::cout << "Dirichlet boundary on cut cell detected." << std::endl;
-                for (size_t i = 0; i < fbs; i++)
-                    asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
-            }
-        }
-        // LOOP OVER POSITIVE DEPENDENT CELLS // Ajouter une boucle sur "where" parcourant dp -/+
-        dp_cells = cl.user_data.dependent_cells_pos;
-        for (auto &dp_cl : dp_cells) {
-            // CELL DOFS
-            auto dp_cell = msh.cells[dp_cl];
-            cell_offset = cell_table.at(offset(msh, dp_cell)); 
-            cell_LHS_offset = cell_offset*cbs;
-            for (size_t i = 0; i < cbs_cut; i++)
-                asm_map.push_back(assembly_index(cell_LHS_offset+i, true));
-            // FACES DOFS
-            fcs = faces(msh, dp_cell);
-            for (size_t face_i = 0; face_i < num_faces; face_i++) {
-                auto fc = fcs[face_i];
-                auto face_LHS_offset = face_SOL_offset(msh, fc);
-                bool in_dom = true;
-                if (loc_zone != element_location::ON_INTERFACE) {
-                    element_location loc_fc = location(msh, fc);
-                    in_dom = (loc_fc == element_location::ON_INTERFACE || loc_fc == loc_zone);
+                // CELL DOFS
+                auto dp_cell = msh.cells[dp_cl];
+                cell_offset = cell_table.at(offset(msh, dp_cell)); 
+                cell_LHS_offset = cell_offset*cbs;
+                for (size_t i = 0; i < cbs_cut; i++)
+                    asm_map.push_back(assembly_index(cell_LHS_offset+i, true));
+                // FACES DOFS
+                fcs = faces(msh, dp_cell);
+                for (size_t face_i = 0; face_i < num_faces; face_i++) {
+                    auto fc = fcs[face_i];
+                    auto face_LHS_offset = face_SOL_offset(msh, fc);
+                    bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET;
+                    for (size_t i = 0; i < fbs; i++)
+                        asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet));
                 }
-                bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET && in_dom;
-                for (size_t i = 0; i < fbs; i++)
-                    asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet));
-            }
-            // ASSEMBLY OF THE FACES IN THE POSITIVE SIDE 
-            for (size_t face_i = 0; face_i < num_faces; face_i++) {
-                auto fc = fcs[face_i];
-                auto d = (location(msh, fc) == element_location::ON_INTERFACE) ? fbs : 0;
-                auto face_LHS_offset = face_SOL_offset(msh, fc) + d;
-                bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET;
-                if (dirichlet)
-                    std::cout << "Dirichlet boundary on cut cell detected." << std::endl;
-                for (size_t i = 0; i < fbs; i++)
-                    asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
+                // ASSEMBLY OF THE FACES IN THE POSITIVE SIDE 
+                for (size_t face_i = 0; face_i < num_faces; face_i++) {
+                    auto fc = fcs[face_i];
+                    auto d = (location(msh, fc) == element_location::ON_INTERFACE) ? fbs : 0;
+                    auto face_LHS_offset = face_SOL_offset(msh, fc) + d;
+                    bool dirichlet = fc.is_boundary && fc.bndtype == boundary::DIRICHLET;
+                    if (dirichlet)
+                        std::cout << "Dirichlet boundary on cut cell detected." << std::endl;
+                    for (size_t i = 0; i < fbs; i++)
+                        asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
+                }
             }
         }
 
@@ -502,8 +460,10 @@ public:
         auto fcs = faces(msh, cl);
         auto num_faces = fcs.size();
         auto local_dofs = cbs + num_faces*fbs;
+        if (is_cut(msh,cl))
+            local_dofs = 2*local_dofs;
 
-        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(cl.user_data.local_dofs);
+        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(local_dofs);
 
         // LOOP OVER FACES
         for (size_t face_i = 0; face_i < num_faces; face_i++) {
@@ -534,7 +494,6 @@ public:
                 dirichlet_data.block(cbs + face_i*fbs, 0, fbs, 1) = mass.ldlt().solve(loc_rhs);
             }
         }
-        std::cout << "ADDING DEPENDENT CELLS DOFS IN GET_DIRICHLET_DATA_EXTENDED" << std::endl;
 
         return dirichlet_data;
     }
@@ -589,44 +548,30 @@ public:
             return;
         
         auto asm_map = init_asm_map_extended(msh, cl);
-        // auto dirichlet_data = get_dirichlet_data_extended(msh, cl);
+        auto dirichlet_data = get_dirichlet_data_extended(msh, cl);
+        assert(asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols());
 
-        // std::cout << "asm_map.size() = " << asm_map.size() << std::endl;
-        // std::cout << "lhs.rows() = "     << lhs.rows()     << std::endl;
-        // std::cout << "lhs.cols() = "     << lhs.cols()     << std::endl;
-        // std::cout << "rhs.rows() = "     << rhs.rows()     << std::endl;
-        // assert(asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols());
-
-        // // ASSEMBLY OF STIFFNESS MATRIX
-        // for (size_t i = 0; i < lhs.rows(); i++) {
-
-        //     if (!asm_map[i].assemble())
-        //         continue;
-
-        //     for (size_t j = 0; j < lhs.cols(); j++) {
-        //         if (asm_map[j].assemble())
-        //             triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
-        //         else {
-	    //             int itmp=asm_map[i];
-        //             RHS(itmp) -= lhs(i,j)*dirichlet_data(j);
-		//         }
-        //     }
-        // }
-        // std::cout << "BEFORE RHS ASSEMBLY" << std::endl;
+        // ASSEMBLY OF STIFFNESS MATRIX
+        for (size_t i = 0; i < lhs.rows(); i++) {
+            if (!asm_map[i].assemble())
+                continue;
+            for (size_t j = 0; j < lhs.cols(); j++) {
+                if (asm_map[j].assemble())
+                    triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
+                else {
+	                int itmp=asm_map[i];
+                    RHS(itmp) -= lhs(i,j)*dirichlet_data(j);
+		        }
+            }
+        }
         
-        // // ASSEMBLY OF THE RHS
-        // for (size_t i = 0; i < rhs.rows(); i++) {
-        //     if (!asm_map[i].assemble())
-        //         continue;
-
-        //     int itmp   = asm_map[i]; 
-        //     std::cout << "itmp = "   << itmp   << std::endl;
-        //     std::cout << "rhs(i) = " << rhs(i) << std::endl;
-        //     std::cout << "RHS.size() = " << RHS.size() << std::endl;
-        //     std::cout << "rhs.size() = " << rhs.size() << std::endl;
-        //     RHS(itmp) += rhs(i);           ///////////// PROBLEM HERE ON THE RHS SIZE 
-        // }
-        // std::cout << "TEST FINAL" << std::endl;
+        // ASSEMBLY OF THE RHS
+        for (size_t i = 0; i < rhs.rows(); i++) {
+            if (!asm_map[i].assemble())
+                continue;
+            int itmp   = asm_map[i]; 
+            RHS(itmp) += rhs(i);       
+        }
     }
                   
     void
@@ -1577,7 +1522,12 @@ public:
                 // std::cout << std::endl;
                 if (cl.user_data.agglo_set == cell_agglo_set::T_KO_NEG || cl.user_data.agglo_set == cell_agglo_set::T_KO_POS) {
                     num_faces = faces(msh, msh.cells[cl.user_data.paired_cell]).size();
-                    dofs += cbs + num_faces*fbs; // ADING THE DOFS OF THE PAIRED CELL FOR THE COMPUTATION OF JUMP IN THE CURRENT CELL
+                    if (!is_cut(msh,msh.cells[cl.user_data.paired_cell])) {
+                        dofs += cbs + num_faces*fbs; // ADING THE DOFS OF THE PAIRED CELL FOR THE COMPUTATION OF JUMP IN THE CURRENT CELL
+                    }
+                    else {
+                        dofs += 2*(cbs + num_faces*fbs); // ADING THE DOFS OF THE PAIRED CELL FOR THE COMPUTATION OF JUMP IN THE CURRENT CELL
+                    }
                 }
                 cl.user_data.local_dofs = dofs;
             }

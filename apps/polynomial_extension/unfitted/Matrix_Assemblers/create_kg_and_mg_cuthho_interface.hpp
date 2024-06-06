@@ -70,13 +70,8 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
     auto assembler = make_one_field_interface_assembler(msh, bcs_fun, hdi);
     std::vector<std::pair<size_t,size_t>> cell_basis_data = assembler.compute_cell_basis_data(msh);
     size_t system_size = assembler.compute_dofs_data(msh, hdi);
-    std::cout << "System size: " << system_size << std::endl;
     auto dofs_proj = assembler.make_projection_operator(msh, hdi, system_size, sol_fun);
     for (auto& cell : msh.cells) {
-      ////////// DEBUG
-      auto offset_cl = offset(msh, cell);
-      std::cout << "Cell: " << offset_cl << std::endl;
-      //////////
       auto contrib = method.make_contrib(msh, cell, test_case, hdi);
       auto lc = contrib.first;
       auto f = contrib.second;
@@ -85,8 +80,7 @@ test_operators(Mesh& msh, hho_degree_info & hdi, meth &method, testType & test_c
       Matrix<RealType, Dynamic, Dynamic> mass = Matrix<RealType, Dynamic, Dynamic>::Zero(n_dof,n_dof);
       mass.block(0,0,cell_mass.rows(),cell_mass.cols()) = cell_mass;
       assembler.assemble_extended(msh, cell, lc, f);  
-      // std::cout << "ASSEMBLAGE OK" << std::endl;  
-      // assembler.assemble_mass(msh, cell, mass);
+      assembler.assemble_mass(msh, cell, mass);
     }
 
     

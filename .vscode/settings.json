@@ -78,7 +78,11 @@
         "variant": "cpp",
         "cholesky": "cpp",
         "*.ipp": "cpp",
-        "geometry": "cpp"
+        "geometry": "cpp",
+        "charconv": "cpp",
+        "format": "cpp",
+        "span": "cpp",
+        "text_encoding": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
